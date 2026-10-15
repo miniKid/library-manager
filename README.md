@@ -73,3 +73,30 @@
 - **本地模式登录后不是管理员？** 第一个登录的用户自动成为管理员；也可以重置缓存（开发者工具清除缓存）后重新登录，或在 `env.js` 中指定 `mockAdminOpenid`。
 - **如何重置本地数据？** 开发者工具「清除缓存 → 清除数据缓存」即可恢复种子数据。
 - **云开发模式借阅失败？** 检查是否已部署 `login` 云函数、`books`/`borrows` 集合是否已创建。
+
+## 协作开发（Git 工作流）
+
+代码托管在 GitHub：`git@github.com:miniKid/library-manager.git`
+
+### 分支模型
+- `main`：稳定分支，对应线上版本，**已开启分支保护**——禁止直接 push，必须通过 Pull Request 合并。
+- `develop`：日常开发集成分支。
+- `feature/xxx`：每人按功能开分支（如 `feature/login`），开发完成后提 PR 合入 `develop`。
+
+### 新成员接入
+1. 克隆仓库：`git clone git@github.com:miniKid/library-manager.git`
+2. 用微信开发者工具「导入项目」，选择**仓库根目录**（不是 `miniprogram/` 子目录），因为 `project.config.json` 在项目根。
+3. 工具会为每人自动生成各自的 `project.private.config.json`（含代码上传私钥）。该文件已被 `.gitignore` 忽略，**切勿手动提交**，否则会泄露上传权限。
+4. 在[微信公众平台](https://mp.weixin.qq.com)后台「成员管理」被添加为**开发者**，否则无法上传代码。
+5. 全组共用 `project.config.json` 中的正式 AppID（`wx3a48ac37f5681280`），不要改成各自的测试号或别的 AppID。
+
+### 日常开发流程
+```bash
+git checkout develop
+git pull
+git checkout -b feature/xxx      # 按功能开分支
+# ... 开发 ...
+git push origin feature/xxx
+# 到 GitHub 提 Pull Request 到 develop，管理员 review 后合并
+```
+发布上线时：将 `develop` 合并到 `main` → 用开发者工具「上传」生成体验版 → 提交审核发布。
