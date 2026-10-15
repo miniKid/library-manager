@@ -1,0 +1,80 @@
+<view class="page safe-bottom">
+  <!-- 非管理员 -->
+  <view class="forbid" wx:if="{{!isAdmin}}">
+    <view class="empty">
+      <view class="empty-icon">🔒</view>
+      <view>您不是管理员，无法访问管理后台</view>
+    </view>
+    <button class="btn-primary forbid-btn" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
+    <!-- 统计卡片 -->
+    <view class="stats-grid" wx:if="{{stats}}">
+      <view class="stat-card" bindtap="goBooks">
+        <view class="stat-num theme-text">{{stats.bookTotal}}</view>
+        <view class="stat-label">馆藏图书</view>
+      </view>
+      <view class="stat-card" bindtap="goBorrows" data-status="borrowing">
+        <view class="stat-num" style="color:#E8930C;">{{stats.borrowedTotal}}</view>
+        <view class="stat-label">借出中</view>
+      </view>
+      <view class="stat-card" bindtap="goBorrows" data-status="pending">
+        <view class="stat-num" style="color:#8A6DE9;">{{stats.pendingTotal}}</view>
+        <view class="stat-label">待确认</view>
+      </view>
+      <view class="stat-card" bindtap="goBorrows" data-status="overdue">
+        <view class="stat-num" style="color:#E54D42;">{{stats.overdueTotal}}</view>
+        <view class="stat-label">已逾期</view>
+      </view>
+      <view class="stat-card" bindtap="goMembers">
+        <view class="stat-num" style="color:#2BA471;">{{stats.memberTotal}}</view>
+        <view class="stat-label">注册用户</view>
+      </view>
+    </view>
+
+    <!-- 快捷入口 -->
+    <view class="menu">
+      <view class="menu-item" bindtap="goBooks">
+        <view class="menu-icon" style="background:#E8F1F8;">📚</view>
+        <view class="menu-body">
+          <view class="menu-title">图书管理</view>
+          <view class="menu-sub">新增、编辑、删除馆藏图书</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goBorrows">
+        <view class="menu-icon" style="background:#FEF3E6;">🔄</view>
+        <view class="menu-body">
+          <view class="menu-title">借阅管理</view>
+          <view class="menu-sub">查看借阅记录，确认归还</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goMembers">
+        <view class="menu-icon" style="background:#E6F7EE;">👥</view>
+        <view class="menu-body">
+          <view class="menu-title">用户管理</view>
+          <view class="menu-sub">管理用户角色与权限</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goSettings">
+        <view class="menu-icon" style="background:#EEF3FF;">⚙️</view>
+        <view class="menu-body">
+          <view class="menu-title">馆藏设置</view>
+          <view class="menu-sub">馆藏地点、借期与限借数量</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goSchedule">
+        <view class="menu-icon" style="background:#FFF4E6;">🗓️</view>
+        <view class="menu-body">
+          <view class="menu-title">值班管理</view>
+          <view class="menu-sub">按地点设置每周/单日值班，控制可借还日期</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+    </view>
+  </block>
+</view>

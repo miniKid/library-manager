@@ -1,0 +1,132 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <view class="form-item">
+      <text class="form-label">ISBN</text>
+      <view class="isbn-wrap">
+        <input
+          class="form-input isbn-input"
+          placeholder="请输入 ISBN"
+          value="{{form.isbn}}"
+          data-field="isbn"
+          bindinput="onInput"
+        />
+        <button
+          class="lookup-btn"
+          size="mini"
+          bindtap="onLookupIsbn"
+          loading="{{lookupLoading}}"
+          disabled="{{lookupLoading}}"
+        >自动获取</button>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">书名 <text class="required">*</text></text>
+      <input
+        class="form-input"
+        placeholder="请输入书名"
+        value="{{form.title}}"
+        data-field="title"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="form-item">
+      <text class="form-label">作者 <text class="required">*</text></text>
+      <input
+        class="form-input"
+        placeholder="请输入作者"
+        value="{{form.author}}"
+        data-field="author"
+        bindinput="onInput"
+      />
+    </view>
+
+    <view class="form-item cover-item">
+      <text class="form-label">封面</text>
+      <view class="cover-box">
+        <image
+          wx:if="{{coverSrc}}"
+          class="cover-preview"
+          src="{{coverSrc}}"
+          mode="aspectFit"
+          bindtap="onPreviewCover"
+        />
+        <view wx:else class="cover-empty" bindtap="onChooseCover">
+          <text class="cover-empty-icon">＋</text>
+          <text class="cover-empty-text">拍照 / 相册选择</text>
+        </view>
+        <view wx:if="{{coverSrc}}" class="cover-actions">
+          <text class="cover-action" bindtap="onChooseCover">更换</text>
+          <text class="cover-action cover-action-danger" bindtap="onRemoveCover">移除</text>
+        </view>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">分类</text>
+      <picker class="picker-wrap" range="{{categories}}" value="{{categoryIndex}}" bindchange="onCategoryChange">
+        <view class="picker-line">
+          <text class="picker-text">{{form.category || '请选择'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">出版社</text>
+      <input
+        class="form-input"
+        placeholder="选填"
+        value="{{form.publisher}}"
+        data-field="publisher"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="form-item">
+      <text class="form-label">出版年份</text>
+      <input
+        class="form-input"
+        placeholder="选填，如 2024"
+        value="{{form.year}}"
+        data-field="year"
+        bindinput="onInput"
+      />
+    </view>
+    <!-- 新增图书不分配馆藏，保存后可在编辑页调整 -->
+    <view class="form-item" wx:if="{{!isEdit}}">
+      <text class="form-label">馆藏库存</text>
+      <text class="stock-tip">新增图书暂不分配馆藏，保存后可在编辑页设置各地点库存。</text>
+    </view>
+    <view class="form-item" wx:if="{{isEdit}}">
+      <text class="form-label">馆藏库存</text>
+      <block wx:if="{{locations.length}}">
+        <view class="stock-field-list">
+          <text class="stock-tip">调整后的库存不能低于正在借出的数量。</text>
+          <view class="stock-field-row" wx:for="{{stockInputs}}" wx:key="loc">
+            <text class="stock-field-loc">{{item.loc}}</text>
+            <input
+              class="form-input stock-field-input"
+              type="number"
+              placeholder="0"
+              value="{{item.num}}"
+              data-idx="{{index}}"
+              bindinput="onStockInput"
+            />
+            <text class="stock-field-unit">本</text>
+          </view>
+        </view>
+      </block>
+      <text wx:else class="stock-tip">暂无馆藏地点，请先到「管理 → 设置」中添加馆藏地点。</text>
+    </view>
+    <view class="form-item form-textarea-item">
+      <text class="form-label">内容简介</text>
+    </view>
+    <textarea
+      class="form-textarea"
+      placeholder="选填，简要介绍图书内容"
+      value="{{form.description}}"
+      data-field="description"
+      bindinput="onInput"
+      maxlength="500"
+    />
+  </view>
+
+  <button class="btn-primary save-btn" bindtap="onSave" loading="{{saving}}">保存</button>
+</view>

@@ -1,0 +1,55 @@
+.page { padding: 24rpx; }
+
+/* 筛选栏 */
+.filter-bar {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 8rpx;
+  margin-bottom: 24rpx;
+}
+.filter-item {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  color: #666;
+  padding: 14rpx 0;
+  border-radius: 12rpx;
+}
+.filter-active {
+  background: #2B5B84;
+  color: #fff;
+  font-weight: 600;
+}
+
+.borrow-item { padding: 24rpx; }
+.borrow-head { margin-bottom: 14rpx; }
+.borrow-title { font-size: 30rpx; font-weight: 600; margin-right: 16rpx; }
+.borrow-row {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.9;
+}
+.borrow-actions {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #F0F1F3;
+}
+.return-btn {
+  display: inline-block;
+  background: #2B5B84;
+  color: #fff;
+  font-size: 26rpx;
+  border-radius: 32rpx;
+  padding: 10rpx 40rpx;
+}
+.cancel-btn {
+  display: inline-block;
+  background: #fff;
+  color: #666;
+  font-size: 26rpx;
+  border-radius: 32rpx;
+  padding: 10rpx 40rpx;
+  border: 1rpx solid #D0D3DA;
+  margin-right: 16rpx;
+}

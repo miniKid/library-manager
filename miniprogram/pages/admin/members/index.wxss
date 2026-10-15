@@ -1,0 +1,70 @@
+.page { padding: 24rpx; }
+
+/* 筛选条 */
+.filters { display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 20rpx; }
+.filter {
+  font-size: 26rpx;
+  color: #666;
+  background: #F2F3F5;
+  border-radius: 28rpx;
+  padding: 12rpx 32rpx;
+}
+.filter-on { background: var(--c-primary); color: #fff; }
+
+.user-item { padding: 24rpx; }
+.user-row { display: flex; align-items: center; }
+.avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+.avatar-img { width: 88rpx; height: 88rpx; }
+.avatar-text { color: #8A8F99; font-size: 32rpx; font-weight: 600; }
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 30rpx; font-weight: 600; }
+.user-id { font-size: 22rpx; color: #999; margin-top: 6rpx; }
+
+/* 借书证状态行 */
+.card-status-row {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 18rpx;
+  padding: 16rpx 20rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+}
+.card-status-tag { flex-shrink: 0; margin: 0 12rpx 0 0; }
+.card-status-desc {
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.6;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 操作按钮 */
+.member-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.mini-btn {
+  background: #F2F3F5;
+  color: #333;
+  font-size: 24rpx;
+  border-radius: 28rpx;
+  padding: 10rpx 28rpx;
+}
+.mini-btn-ok { background: #07c160; color: #fff; }
+.mini-btn-no { background: #fff; color: #E54D42; border: 1rpx solid #E54D42; }
+.mini-btn-danger { background: #fff; color: #E54D42; border: 1rpx solid #E54D42; }
+.mini-btn-dis { background: #F7F8FA; color: #BBB; }

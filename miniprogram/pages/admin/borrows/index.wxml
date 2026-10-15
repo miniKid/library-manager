@@ -1,0 +1,49 @@
+<view class="page safe-bottom">
+  <!-- 状态筛选 -->
+  <view class="filter-bar">
+    <view
+      wx:for="{{filters}}"
+      wx:key="key"
+      class="filter-item {{activeFilter === item.key ? 'filter-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onFilter"
+    >{{item.label}}</view>
+  </view>
+
+  <view wx:if="{{borrows.length === 0 && !loading}}" class="card">
+    <view class="empty">
+      <view class="empty-icon">🕐</view>
+      <view>暂无相关借阅记录</view>
+    </view>
+  </view>
+
+  <view wx:for="{{borrows}}" wx:key="_id" class="card borrow-item">
+    <view class="borrow-head flex-between">
+      <view class="borrow-title ellipsis">{{item.bookTitle}}</view>
+      <view class="tag {{item.statusInfo.cls}}">{{item.statusInfo.text}}</view>
+    </view>
+    <view class="borrow-row">借阅人：{{item.userName}}</view>
+    <view class="borrow-row" wx:if="{{item.location}}">馆藏地点：{{item.location}}</view>
+    <view class="borrow-row">申请日期：{{item.borrowDateText || '—'}}</view>
+    <view class="borrow-row" wx:if="{{item.scheduledPickupDateText}}">预约取书：{{item.scheduledPickupDateText}}</view>
+    <view class="borrow-row">借出日期：{{item.deliverDateText || '—'}}</view>
+    <view class="borrow-row" wx:if="{{item.status !== 'pending'}}">应还日期：{{item.dueDateText || '—'}}</view>
+    <view class="borrow-row" wx:if="{{item.returnDateText}}">归还日期：{{item.returnDateText || '—'}}</view>
+    <view wx:if="{{item.status === 'pending'}}" class="borrow-actions">
+      <view class="cancel-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onCancelBorrow">
+        取消申请
+      </view>
+      <view class="return-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onConfirmBorrow">
+        确认借出
+      </view>
+    </view>
+    <view wx:if="{{item.status === 'return_requested'}}" class="borrow-actions">
+      <view class="cancel-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onCancelReturn">
+        取消还书申请
+      </view>
+      <view class="return-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onReturn">
+        确认归还
+      </view>
+    </view>
+  </view>
+</view>

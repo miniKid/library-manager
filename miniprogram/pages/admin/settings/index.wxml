@@ -1,0 +1,66 @@
+<view class="page safe-bottom">
+  <!-- 馆藏地点 -->
+  <view class="card">
+    <view class="section-title">馆藏地点</view>
+    <view class="loc-list">
+      <view class="loc-row" wx:for="{{locations}}" wx:key="*this">
+        <text class="loc-name">{{item}}</text>
+        <text class="loc-del" data-idx="{{index}}" bindtap="onRemoveLocation">删除</text>
+      </view>
+    </view>
+    <view class="loc-add">
+      <input
+        class="loc-input"
+        placeholder="输入新馆藏地点名称"
+        value="{{newLocation}}"
+        bindinput="onLocationInput"
+        confirm-type="done"
+        bindconfirm="onAddLocation"
+      />
+      <view class="loc-add-btn" bindtap="onAddLocation">添加</view>
+    </view>
+  </view>
+
+  <!-- 借阅规则 -->
+  <view class="card">
+    <view class="section-title">借阅规则</view>
+    <view class="form-item">
+      <text class="form-label">借期（天）</text>
+      <input
+        class="form-input"
+        type="number"
+        value="{{borrowDays}}"
+        bindinput="onBorrowDaysInput"
+      />
+    </view>
+    <view class="form-item">
+      <text class="form-label">每人同时最多借阅（本）</text>
+      <input
+        class="form-input"
+        type="number"
+        value="{{maxBorrow}}"
+        bindinput="onMaxBorrowInput"
+      />
+    </view>
+    <view class="form-item">
+      <text class="form-label">可续借次数（0 关闭）</text>
+      <input
+        class="form-input"
+        type="number"
+        value="{{renewTimes}}"
+        bindinput="onRenewTimesInput"
+      />
+    </view>
+    <view class="form-item">
+      <text class="form-label">每次续借延长（天）</text>
+      <input
+        class="form-input"
+        type="number"
+        value="{{renewDays}}"
+        bindinput="onRenewDaysInput"
+      />
+    </view>
+  </view>
+
+  <button class="btn-primary save-btn" bindtap="onSave" loading="{{saving}}">保存设置</button>
+</view>

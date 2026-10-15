@@ -1,0 +1,47 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/book-detail/index",
+    "pages/my/index",
+    "pages/my/borrows/index",
+    "pages/login/index",
+    "pages/admin/index",
+    "pages/admin/books/index",
+    "pages/admin/book-edit/index",
+    "pages/admin/borrows/index",
+    "pages/admin/book-borrows/index",
+    "pages/admin/members/index",
+    "pages/admin/settings/index",
+    "pages/admin/schedule/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#2B5B84",
+    "navigationBarTitleText": "云图图书馆",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F5F6F8",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#8A8F99",
+    "selectedColor": "#2B5B84",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/admin/index",
+        "text": "管理"
+      },
+      {
+        "pagePath": "pages/my/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

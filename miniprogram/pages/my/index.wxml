@@ -1,0 +1,219 @@
+<import src="borrow-item.wxml" />
+<view class="page safe-bottom">
+  <!-- 用户信息 -->
+  <view class="user-card" wx:if="{{userInfo}}" bindtap="onUserTap">
+    <view class="avatar">
+      <image wx:if="{{userInfo.avatarUrl}}" src="{{userInfo.avatarUrl}}" class="avatar-img" />
+      <text wx:else class="avatar-text">{{userInfo.coverChar}}</text>
+    </view>
+    <view class="user-info">
+      <view class="user-name-row">
+        <view class="nickname">{{userInfo.nickname}}</view>
+        <!-- 双击身份标签可在本地模拟模式切换模拟身份（测试后门） -->
+        <view class="role-tag" catchtap="onIdentityTap">
+          <view class="tag {{isAdmin ? 'tag-orange' : 'tag-blue'}}">
+            {{isAdmin ? '管理员' : '读者'}}
+          </view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{isAdmin}}" class="admin-entry" bindtap="goAdmin">管理后台 ›</view>
+  </view>
+
+  <!-- 借书证（管理员身份只是叠加的管理权限，借书证区对所有用户按其卡状态展示） -->
+  <view class="section" wx:if="{{userInfo && cardInfo}}">
+    <view class="section-header">
+      <text class="section-title">借书证</text>
+      <text class="section-count">{{cardInfo.text}}</text>
+    </view>
+    <view class="card card-status">
+      <view class="card-status-head">
+        <view class="tag {{cardInfo.status === 'active' ? 'tag-green' : (cardInfo.status === 'pending' ? 'tag-orange' : (cardInfo.status === 'rejected' ? 'tag-red' : 'tag-blue'))}}">{{cardInfo.text}}</view>
+      </view>
+      <view class="card-status-desc">{{cardInfo.desc}}</view>
+      <view wx:if="{{cardInfo.canApply}}" class="borrow-actions">
+        <view class="return-btn" bindtap="openApplyCard">申请开通借书证</view>
+      </view>
+      <view wx:if="{{cardInfo.canChangeLocation}}" class="borrow-actions">
+        <view class="return-btn" bindtap="openChangeLocation">修改借阅地址</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 未登录 -->
+  <view class="user-card unlogged" wx:else bindtap="goLogin">
+    <view class="avatar avatar-gray">
+      <text class="avatar-text">未</text>
+    </view>
+    <view class="user-info">
+      <view class="nickname">未登录</view>
+      <view class="unlogged-tip">点击登录，即可在线借阅图书</view>
+    </view>
+  </view>
+
+  <!-- 我的借阅（仅进行中，完整记录见新页面） -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">我的借阅</text>
+      <view wx:if="{{borrows.length}}" class="section-count link" bindtap="goFullBorrows">完整借阅记录（共 {{borrows.length}} 条）</view>
+    </view>
+
+    <block wx:if="{{unfinishedBorrows.length}}">
+      <block wx:for="{{unfinishedBorrows}}" wx:key="_id">
+        <template is="borrowItem" data="{{item: item, readonly: false}}" />
+      </block>
+    </block>
+
+    <view wx:elif="{{borrows.length === 0 && !loading}}" class="card empty-inline">
+      <view class="empty">
+        <view class="empty-icon">📖</view>
+        <view>还没有借阅记录，去首页逛逛吧</view>
+      </view>
+    </view>
+    <view wx:elif="{{!loading}}" class="card empty-inline">
+      <view class="empty">
+        <view class="empty-icon">📋</view>
+        <view>暂无进行中的借阅，可在上方查看完整记录</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 退出登录 -->
+  <view wx:if="{{userInfo}}" class="logout" bindtap="onLogout">退出登录</view>
+
+  <!-- 修改资料弹窗 -->
+  <view class="mask" wx:if="{{editPanel.show}}" bindtap="closeEditPanel"></view>
+  <view class="date-sheet" wx:if="{{editPanel.show}}">
+    <view class="date-sheet-head">
+      <view class="date-sheet-title">修改资料</view>
+    </view>
+    <view class="apply-form">
+      <view class="avatar-row edit-avatar-row">
+        <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onEditAvatarChoose">
+          <image wx:if="{{editPanel.avatarUrl}}" src="{{editPanel.avatarUrl}}" class="avatar-img" />
+          <view wx:else class="avatar-placeholder">
+            <text class="avatar-plus">＋</text>
+            <text class="avatar-tip">选择头像</text>
+          </view>
+        </button>
+      </view>
+      <view class="apply-row">
+        <text class="apply-label">昵称（Teams ID）</text>
+        <input class="apply-input" type="nickname" placeholder="请输入昵称" value="{{editPanel.nickname}}" bindinput="onEditNicknameInput" />
+      </view>
+    </view>
+    <view class="date-sheet-foot">
+      <view class="date-sheet-actions">
+        <button class="btn-plain" bindtap="closeEditPanel">取消</button>
+        <button class="btn-primary" bindtap="onSaveProfile">保存</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选择还书日期弹窗 -->
+  <view class="mask" wx:if="{{returnPanel.show}}" bindtap="closeReturnPanel"></view>
+  <view class="date-sheet" wx:if="{{returnPanel.show}}">
+    <view class="date-sheet-head">
+      <view class="date-sheet-title">选择还书日期</view>
+      <view class="date-sheet-loc">《{{returnPanel.bookTitle}}》　馆藏：{{returnPanel.location}}</view>
+    </view>
+    <view class="cal-head">
+      <view class="cal-nav {{returnCalendar.canPrev ? '' : 'cal-nav-dis'}}" bindtap="prevMonth">‹</view>
+      <view class="cal-title">{{returnCalendar.monthLabel}}</view>
+      <view class="cal-nav {{returnCalendar.canNext ? '' : 'cal-nav-dis'}}" bindtap="nextMonth">›</view>
+    </view>
+    <view class="cal-week-head">
+      <view class="cal-week-cell" wx:for="{{WEEKDAYS}}" wx:key="*this">{{item}}</view>
+    </view>
+    <scroll-view scroll-y class="cal-scroll">
+      <view class="cal-grid" wx:for="{{returnCalendar.weeks}}" wx:key="index" wx:for-item="week">
+        <view
+          wx:for="{{week}}"
+          wx:key="index"
+          wx:for-item="d"
+          class="cal-cell {{d ? (d.available ? 'cal-avail' : (d.inRange ? 'cal-dis' : 'cal-out')) : 'cal-empty'}} {{d && d.date === returnPanel.selected ? 'cal-sel' : ''}}"
+          data-date="{{d.date}}"
+          data-available="{{d.available}}"
+          bindtap="onPickReturnDate"
+        >
+          <block wx:if="{{d}}">
+            <text class="cal-day">{{d.day}}</text>
+            <view class="cal-today {{d.today ? 'cal-today-show' : ''}}"></view>
+          </block>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="cal-legend">
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-avail"></view>
+        <text>有人值班</text>
+      </view>
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-dis"></view>
+        <text>无人值班</text>
+      </view>
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-out"></view>
+        <text>超出预约期</text>
+      </view>
+    </view>
+    <view class="date-sheet-foot">
+      <view class="date-selected" wx:if="{{returnPanel.selected}}">已选：{{returnPanel.selectedText}}</view>
+      <view class="date-selected date-selected-empty" wx:else>请选择日期</view>
+      <view class="date-sheet-actions">
+        <button class="btn-plain" bindtap="closeReturnPanel">取消</button>
+        <button class="btn-primary" disabled="{{!returnPanel.selected}}" bindtap="onSubmitReturn">提交归还申请</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 申请开通借书证弹窗 -->
+  <view class="mask" wx:if="{{applyPanel.show}}" bindtap="closeApplyPanel"></view>
+  <view class="date-sheet" wx:if="{{applyPanel.show}}">
+    <view class="date-sheet-head">
+      <view class="date-sheet-title">申请开通借书证</view>
+    </view>
+    <view class="apply-form">
+      <view class="apply-row">
+        <text class="apply-label">手机号</text>
+        <input class="apply-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{phone}}" bindinput="onApplyPhoneInput" />
+      </view>
+      <picker class="apply-picker" mode="selector" range="{{applyLocations}}" value="{{locationIndex}}" bindchange="onApplyLocationChange">
+        <view class="apply-row">
+          <text class="apply-label">归属馆藏</text>
+          <view class="apply-input {{applyLocations[locationIndex] ? '' : 'apply-input-ph'}}">{{applyLocations[locationIndex] || '请选择馆藏地点'}}</view>
+        </view>
+      </picker>
+    </view>
+    <view class="apply-tip">申请将由管理员审批，审批通过后方可借阅该馆藏的图书</view>
+    <view class="date-sheet-foot">
+      <view class="date-sheet-actions">
+        <button class="btn-plain" bindtap="closeApplyPanel">取消</button>
+        <button class="btn-primary" bindtap="onSubmitCardApply">提交申请</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 修改借阅地址弹窗 -->
+  <view class="mask" wx:if="{{locationPanel.show}}" bindtap="closeLocationPanel"></view>
+  <view class="date-sheet" wx:if="{{locationPanel.show}}">
+    <view class="date-sheet-head">
+      <view class="date-sheet-title">修改借阅地址</view>
+    </view>
+    <view class="apply-form">
+      <view wx:if="{{locationPanel.warn}}" class="apply-warn">{{locationPanel.warn}}</view>
+      <picker class="apply-picker" mode="selector" range="{{locationPanel.locations}}" value="{{locationPanel.index}}" bindchange="onLocationChange">
+        <view class="apply-row">
+          <text class="apply-label">归属馆藏</text>
+          <view class="apply-input {{locationPanel.locations[locationPanel.index] ? '' : 'apply-input-ph'}}">{{locationPanel.locations[locationPanel.index] || '请选择馆藏地点'}}</view>
+        </view>
+      </picker>
+    </view>
+    <view class="date-sheet-foot">
+      <view class="date-sheet-actions">
+        <button class="btn-plain" bindtap="closeLocationPanel">取消</button>
+        <button class="btn-primary" disabled="{{locationPanel.warn}}" bindtap="onSubmitLocation">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

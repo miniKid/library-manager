@@ -1,0 +1,9 @@
+{
+  "name": "lookupBook",
+  "version": "1.0.0",
+  "description": "通过 ISBN 查询图书信息并转存封面",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

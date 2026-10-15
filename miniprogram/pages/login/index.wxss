@@ -1,0 +1,74 @@
+.page {
+  padding: 80rpx 48rpx;
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 60rpx;
+}
+.logo-icon { font-size: 110rpx; }
+.logo-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--c-primary);
+  margin-top: 20rpx;
+}
+.logo-sub { font-size: 26rpx; color: #999; margin-top: 10rpx; }
+
+.form-card { padding: 48rpx 40rpx; }
+
+.avatar-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 36rpx;
+}
+.avatar-btn {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  padding: 0;
+  background: #F2F4F7;
+  overflow: hidden;
+  border: 2rpx dashed #C0C4CC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-btn::after { border: none; }
+.avatar-img { width: 160rpx; height: 160rpx; }
+.avatar-placeholder { display: flex; flex-direction: column; align-items: center; }
+.avatar-plus { font-size: 48rpx; color: #B0B4BC; line-height: 1; }
+.avatar-tip { font-size: 22rpx; color: #B0B4BC; margin-top: 8rpx; }
+
+.submit-btn { margin-top: 48rpx; }
+.tip {
+  text-align: center;
+  font-size: 22rpx;
+  color: #B0B4BC;
+  margin-top: 32rpx;
+}
+
+/* 老用户直接登录 */
+.avatar-static {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: #ECE6DA;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-static .avatar-img { width: 160rpx; height: 160rpx; }
+.avatar-static .avatar-plus { font-size: 72rpx; color: #B0B4BC; line-height: 1; }
+.welcome {
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 4rpx 0 24rpx;
+}
+
+/* 加载占位 */
+.loading-card { padding: 80rpx 40rpx; }
+.loading-tip { text-align: center; font-size: 26rpx; color: var(--c-text-3); }

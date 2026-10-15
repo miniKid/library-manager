@@ -1,0 +1,68 @@
+.page {
+  padding: 24rpx;
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 区块通用 */
+.section { margin-top: 8rpx; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+  padding: 0 4rpx;
+}
+.section-title { font-size: 32rpx; font-weight: 600; }
+.section-count { font-size: 24rpx; color: #999; }
+.section-count.link {
+  color: var(--c-primary);
+}
+
+.empty-inline { padding: 40rpx 0; }
+
+/* 借书卡片 */
+.borrow-card {
+  padding: 24rpx;
+}
+.borrow-head { margin-bottom: 16rpx; }
+.borrow-title-group { display: flex; align-items: baseline; flex: 1; min-width: 0; }
+.borrow-title { font-size: 30rpx; font-weight: 600; margin-right: 16rpx; }
+.borrow-loc { font-size: 24rpx; font-weight: 400; color: #999; }
+.borrow-meta {
+  font-size: 26rpx;
+  color: #888;
+  line-height: 1.9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx 24rpx;
+}
+.borrow-status-tip {
+  font-size: 24rpx;
+  color: var(--c-warning);
+  margin-top: 12rpx;
+}
+.borrow-actions {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #F0F1F3;
+}
+.return-btn {
+  display: inline-block;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 26rpx;
+  border-radius: var(--r-pill);
+  padding: 10rpx 40rpx;
+}
+.cancel-btn {
+  display: inline-block;
+  background: #fff;
+  color: var(--c-text-2);
+  font-size: 26rpx;
+  border-radius: var(--r-pill);
+  padding: 10rpx 40rpx;
+  border: 1rpx solid var(--c-line);
+  margin-right: 16rpx;
+}

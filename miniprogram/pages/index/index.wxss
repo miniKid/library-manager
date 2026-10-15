@@ -1,0 +1,132 @@
+.page {
+  padding-bottom: 140rpx;
+}
+
+/* 搜索栏 */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  margin: 24rpx 24rpx 0;
+  border-radius: 40rpx;
+  padding: 12rpx 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+.search-icon { margin-right: 12rpx; font-size: 30rpx; }
+.search-input { flex: 1; font-size: 28rpx; }
+.search-clear { color: #C0C4CC; padding: 8rpx 0 8rpx 16rpx; font-size: 28rpx; }
+
+/* 可借筛选 */
+.filter-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+.filter-item {
+  flex-shrink: 0;
+  padding: 10rpx 30rpx;
+  margin-right: 16rpx;
+  background: #fff;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  color: #555;
+  border: 1rpx solid transparent;
+}
+.filter-active {
+  background: #2B5B84;
+  color: #fff;
+}
+
+/* 图书卡片 */
+.book-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+.book-cover {
+  width: 120rpx;
+  height: 160rpx;
+  border-radius: 10rpx;
+  margin-right: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.book-cover-text { color: #fff; font-size: 48rpx; font-weight: 600; }
+.book-cover-img image { width: 120rpx; height: 160rpx; }
+.book-info { flex: 1; min-width: 0; }
+.book-title { font-size: 30rpx; font-weight: 600; margin-bottom: 8rpx; }
+.book-author { font-size: 24rpx; color: #999; margin-bottom: 12rpx; }
+.book-meta { display: flex; align-items: center; }
+
+.book-stocks {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8rpx;
+}
+
+.stock-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38rpx;
+  padding: 0 16rpx;
+  font-size: 22rpx;
+  line-height: 1;
+  border-radius: 8rpx;
+  margin-right: 12rpx;
+  box-sizing: border-box;
+}
+
+.stock-chip-on {
+  color: #4a7dff;
+  background: #eef3ff;
+}
+
+.stock-chip-off {
+  color: #b0b3bf;
+  background: #f4f5f7;
+}
+.book-arrow { color: #C0C4CC; font-size: 40rpx; padding-left: 12rpx; }
+
+/* 加载更多 */
+.load-more {
+  text-align: center;
+  color: #B0B4BC;
+  font-size: 24rpx;
+  padding: 24rpx 0;
+}
+
+/* 底部登录提示 */
+.login-tip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 100rpx;
+  margin: 0 24rpx;
+  background: #2B5B84;
+  color: #fff;
+  border-radius: 40rpx;
+  padding: 24rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 28rpx;
+  box-shadow: 0 6rpx 24rpx rgba(43, 91, 132, 0.35);
+}
+.login-tip-btn {
+  background: #fff;
+  color: #2B5B84;
+  border-radius: 32rpx;
+  padding: 8rpx 28rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+}

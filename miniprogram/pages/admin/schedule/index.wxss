@@ -1,0 +1,214 @@
+.page {
+  padding: 24rpx;
+  padding-bottom: 40rpx;
+}
+
+/* 地点切换栏 */
+.loc-bar {
+  margin-bottom: 24rpx;
+}
+.loc-scroll {
+  white-space: nowrap;
+}
+.loc-tab {
+  display: inline-block;
+  padding: 14rpx 36rpx;
+  margin-right: 16rpx;
+  background: #fff;
+  color: #666;
+  font-size: 28rpx;
+  border-radius: 36rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+.loc-tab-active {
+  background: #2B5B84;
+  color: #fff;
+}
+.loc-empty {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 40rpx 0;
+  text-align: center;
+  color: #999;
+  font-size: 28rpx;
+}
+
+/* 卡片 */
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.section-tip {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
+/* 每周设置 */
+.week-list {
+  display: flex;
+  margin-top: 28rpx;
+}
+.week-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+.week-name {
+  font-size: 28rpx;
+  color: #333;
+}
+.week-switch {
+  width: 76rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  background: #e5e7eb;
+  position: relative;
+  transition: background 0.2s;
+}
+.week-switch .switch-dot {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.15);
+  transition: left 0.2s;
+}
+.week-switch.switch-on {
+  background: #07c160;
+}
+.week-switch.switch-on .switch-dot {
+  left: 36rpx;
+}
+.week-off .week-name { color: #999; }
+
+/* 日历 */
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 24rpx 0 8rpx;
+}
+.cal-nav {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  color: #666;
+}
+.cal-title {
+  min-width: 220rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.cal-week-head {
+  display: flex;
+  margin-top: 20rpx;
+}
+.cal-week-cell {
+  width: calc(100% / 7);
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
+  padding: 8rpx 0;
+}
+.cal-grid {
+  display: flex;
+}
+.cal-cell {
+  width: calc(100% / 7);
+  height: 96rpx;
+  border-radius: 14rpx;
+  margin: 4rpx 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+}
+.cal-empty {
+  background: transparent;
+}
+.cal-day {
+  font-size: 30rpx;
+  line-height: 1.2;
+}
+.cal-avail {
+  background: #e8f7ee;
+  color: #07c160;
+}
+.cal-dis {
+  background: #f4f5f7;
+  color: #c0c4cc;
+}
+.cal-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: transparent;
+  margin-top: 4rpx;
+}
+.cal-dot-show {
+  background: #2B5B84;
+}
+
+/* 图例 */
+.legend {
+  display: flex;
+  gap: 28rpx;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f0f2f5;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 24rpx;
+  color: #666;
+  gap: 8rpx;
+}
+.legend-box {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 8rpx;
+}
+.box-avail { background: #e8f7ee; border: 1rpx solid #07c160; }
+.box-dis { background: #f4f5f7; border: 1rpx solid #d0d3da; }
+.legend-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #2B5B84;
+}
+
+/* 保存按钮 */
+.save-btn {
+  width: 100%;
+  height: 92rpx;
+  line-height: 92rpx;
+  background: #2B5B84;
+  color: #fff;
+  font-size: 32rpx;
+  border-radius: 16rpx;
+}
+.save-btn[disabled] {
+  background: #c9d4df;
+  color: #fff;
+}

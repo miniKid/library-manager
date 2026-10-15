@@ -1,0 +1,9 @@
+{
+  "name": "migrateStocks",
+  "version": "1.0.0",
+  "description": "一次性迁移：初始化 settings 集合并为存量图书随机分配馆藏地点",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

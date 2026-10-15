@@ -1,0 +1,142 @@
+<view class="page" wx:if="{{book}}">
+  <!-- 封面与基本信息 -->
+  <view class="header">
+    <view class="cover" style="background: {{coverBg}}">
+      <image wx:if="{{book.cover}}" src="{{book.cover}}" mode="aspectFill" class="cover-img" />
+      <text wx:else class="cover-text">{{coverChar}}</text>
+    </view>
+    <view class="header-info">
+      <view class="title">{{book.title}}</view>
+      <view class="author">{{book.author}}</view>
+      <view class="tags">
+        <view class="tag tag-blue">{{book.category}}</view>
+        <view class="tag {{book.status === 'available' ? 'tag-green' : (book.status === 'unstocked' ? 'tag-gray' : 'tag-red')}}}">{{book.status === 'available' ? '可借' : (book.status === 'unstocked' ? '待配馆藏' : '借出')}}</view>
+        <view wx:if="{{book.status !== 'unstocked'}}" class="tag tag-gray">共 {{book.stock}} 本</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 详细信息 -->
+  <view class="card">
+    <view class="info-row">
+      <text class="info-label">ISBN</text>
+      <text class="info-value">{{book.isbn || '—'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">出版社</text>
+      <text class="info-value">{{book.publisher || '—'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">出版年份</text>
+      <text class="info-value">{{book.year || '—'}}</text>
+    </view>
+    <view class="info-row {{isAdmin ? 'info-row-tap' : ''}}" bindtap="onTapBorrowCount">
+      <text class="info-label">被借次数</text>
+      <text class="info-value">{{book.borrowCount || 0}} 次<text wx:if="{{isAdmin}}" class="tap-hint">查看记录 ›</text></text>
+    </view>
+  </view>
+
+  <!-- 馆藏分布 -->
+  <view class="card">
+    <view class="section-title">馆藏分布</view>
+    <view class="stock-row" wx:for="{{book.stockChips}}" wx:key="loc">
+      <text class="stock-loc">{{item.loc}}</text>
+      <text class="stock-num {{item.available ? 'stock-num-on' : 'stock-num-off'}}">
+        {{item.available ? '可借 ' + item.num + ' 本' : (item.used ? '已被预约，暂无可借' : '暂无库存')}}
+      </text>
+    </view>
+    <view wx:if="{{!book.stockChips || !book.stockChips.length}}" class="stock-empty">
+      暂未配置馆藏地点
+    </view>
+  </view>
+
+  <!-- 简介 -->
+  <view class="card">
+    <view class="section-title">内容简介</view>
+    <view class="desc">{{book.description || '暂无简介'}}</view>
+  </view>
+
+  <view class="card borrow-note">
+    <view class="section-title">借阅说明</view>
+    <view class="note-line">1. 在线提交借阅申请，审核通过后线下领取图书</view>
+    <view class="note-line">2. 单次借阅时长 {{settings.borrowDays}} 天，每人同时最多借 {{settings.maxBorrow}} 本</view>
+    <view class="note-line">3. 请在到期日前归还，逾期将影响信用</view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="footer safe-bottom">
+    <button
+      wx:if="{{book.status === 'available'}}"
+      class="btn-primary footer-btn"
+      bindtap="onBorrow"
+    >立即借阅</button>
+    <button
+      wx:elif="{{book.status === 'unstocked'}}"
+      class="btn-primary footer-btn"
+      disabled
+    >暂无馆藏</button>
+    <button
+      wx:else
+      class="btn-primary footer-btn"
+      disabled
+    >已被借出</button>
+  </view>
+
+  <!-- 选择取书日期弹窗 -->
+  <view class="mask" wx:if="{{datePanel.show}}" bindtap="closeDatePanel"></view>
+  <view class="date-sheet" wx:if="{{datePanel.show}}">
+    <view class="date-sheet-head">
+      <view class="date-sheet-title">选择取书日期</view>
+      <view class="date-sheet-loc">馆藏地点：{{datePanel.location}}</view>
+    </view>
+    <view class="cal-head">
+      <view class="cal-nav {{dateCalendar.canPrev ? '' : 'cal-nav-dis'}}" bindtap="prevMonth">‹</view>
+      <view class="cal-title">{{dateCalendar.monthLabel}}</view>
+      <view class="cal-nav {{dateCalendar.canNext ? '' : 'cal-nav-dis'}}" bindtap="nextMonth">›</view>
+    </view>
+    <view class="cal-week-head">
+      <view class="cal-week-cell" wx:for="{{WEEKDAYS}}" wx:key="*this">{{item}}</view>
+    </view>
+    <scroll-view scroll-y class="cal-scroll">
+      <view class="cal-grid" wx:for="{{dateCalendar.weeks}}" wx:key="index" wx:for-item="week">
+        <view
+          wx:for="{{week}}"
+          wx:key="index"
+          wx:for-item="d"
+          class="cal-cell {{d ? (d.available ? 'cal-avail' : (d.inRange ? 'cal-dis' : 'cal-out')) : 'cal-empty'}} {{d && d.date === datePanel.selected ? 'cal-sel' : ''}}"
+          data-date="{{d.date}}"
+          data-available="{{d.available}}"
+          bindtap="onPickDate"
+        >
+          <block wx:if="{{d}}">
+            <text class="cal-day">{{d.day}}</text>
+            <view class="cal-today {{d.today ? 'cal-today-show' : ''}}"></view>
+          </block>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="cal-legend">
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-avail"></view>
+        <text>有人值班</text>
+      </view>
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-dis"></view>
+        <text>无人值班</text>
+      </view>
+      <view class="cal-legend-item">
+        <view class="cal-legend-box box-out"></view>
+        <text>超出预约期</text>
+      </view>
+    </view>
+    <view class="date-sheet-foot">
+      <view class="date-selected" wx:if="{{datePanel.selected}}">已选：{{datePanel.selectedText}}</view>
+      <view class="date-selected date-selected-empty" wx:else>请选择日期</view>
+      <view class="date-sheet-actions">
+        <button class="btn-plain" bindtap="closeDatePanel">取消</button>
+        <button class="btn-primary" disabled="{{!datePanel.selected}}" bindtap="onSubmitBorrow">提交申请</button>
+      </view>
+    </view>
+  </view>
+
+</view>

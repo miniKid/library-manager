@@ -1,0 +1,184 @@
+/**app.wxss - 全局样式**/
+page {
+  /* 书卷墨蓝 · 设计令牌 */
+  --c-primary: #1F3A5F;
+  --c-primary-2: #2B5B84;
+  --c-accent: #C8A063;
+  --c-bg: #F7F5F0;
+  --c-surface: #FFFFFF;
+  --c-text: #2B2B2B;
+  --c-text-2: #666666;
+  --c-text-3: #999999;
+  --c-line: #ECE8E0;
+  --c-success: #3A8C5F;
+  --c-warning: #D98A3D;
+  --c-danger: #C0392B;
+  --r-sm: 12rpx;
+  --r-md: 16rpx;
+  --r-lg: 20rpx;
+  --r-pill: 999rpx;
+  --shadow-card: 0 4rpx 16rpx rgba(31, 58, 95, 0.08);
+  --shadow-float: 0 8rpx 28rpx rgba(31, 58, 95, 0.18);
+
+  background: var(--c-bg);
+  font-size: 28rpx;
+  color: var(--c-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 主题色 */
+.theme-bg { background: var(--c-primary); }
+.theme-text { color: var(--c-primary); }
+.theme-border { border-color: var(--c-primary); }
+
+/* 通用布局 */
+.container {
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: var(--c-surface);
+  border-radius: var(--r-md);
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.flex { display: flex; align-items: center; }
+.flex-1 { flex: 1; min-width: 0; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* 按钮 */
+.btn-primary {
+  background: var(--c-primary);
+  color: #fff;
+  border-radius: var(--r-pill);
+  font-size: 30rpx;
+  padding: 0;
+  line-height: 2.4;
+}
+.btn-primary::after { border: none; }
+.btn-plain {
+  background: #fff;
+  color: var(--c-primary);
+  border: 1rpx solid var(--c-primary);
+  border-radius: var(--r-pill);
+  font-size: 30rpx;
+  padding: 0;
+  line-height: 2.4;
+}
+.btn-plain::after { border: none; }
+.btn-danger {
+  background: #fff;
+  color: var(--c-danger);
+  border: 1rpx solid var(--c-danger);
+  border-radius: var(--r-pill);
+  font-size: 30rpx;
+  padding: 0;
+  line-height: 2.4;
+}
+.btn-danger::after { border: none; }
+button[disabled] { opacity: 0.5; }
+
+/* 标签 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38rpx;
+  padding: 0 16rpx;
+  font-size: 22rpx;
+  line-height: 1;
+  border-radius: 8rpx;
+  margin-right: 12rpx;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+.tag-blue { background: #E8EDF2; color: #3A5A7A; }
+.tag-green { background: #E7F2EC; color: var(--c-success); }
+.tag-orange { background: #FBEEDD; color: var(--c-warning); }
+.tag-red { background: #F7E7E4; color: var(--c-danger); }
+.tag-gray { background: #F2F3F5; color: #8A8F99; }
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 120rpx 0;
+  color: #B0B4BC;
+  font-size: 26rpx;
+}
+.empty-icon { font-size: 80rpx; margin-bottom: 20rpx; }
+
+/* 搜索框 */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 40rpx;
+  padding: 12rpx 24rpx;
+  margin-bottom: 24rpx;
+}
+.search-input { flex: 1; font-size: 28rpx; }
+
+/* 表单 */
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.form-label { width: 160rpx; color: #666; font-size: 28rpx; }
+.form-value { flex: 1; }
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+}
+.picker-value { color: #333; }
+.placeholder { color: #C0C4CC; }
+
+/* 列表 */
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.list-item:last-child { border-bottom: none; }
+
+/* 导航按钮 */
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+}
+.nav-btn-title { font-size: 30rpx; font-weight: 500; }
+.nav-btn-arrow { color: #C0C4CC; font-size: 28rpx; }
+
+/* 分割线 */
+.divider { height: 1rpx; background: #F0F1F3; margin: 24rpx 0; }
+
+/* 弹窗遮罩 */
+.mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+/* 底部安全区 */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

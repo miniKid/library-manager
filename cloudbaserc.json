@@ -1,0 +1,48 @@
+{
+  "envId": "cloudbase-d4g8acmf9ed3f9ed6",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "login",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "initDB",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "lookupBook",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "fixBookCover",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "migrateStocks",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "borrowManager",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "notify",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+<import src="../borrow-item.wxml" />
+<view class="page safe-bottom">
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">完整借阅记录</text>
+      <text wx:if="{{borrows.length}}" class="section-count">共 {{borrows.length}} 条</text>
+    </view>
+
+    <block wx:if="{{borrows.length}}">
+      <block wx:for="{{borrows}}" wx:key="_id">
+        <template is="borrowItem" data="{{item: item, readonly: true}}" />
+      </block>
+    </block>
+
+    <view wx:elif="{{!loading}}" class="card empty-inline">
+      <view class="empty">
+        <view class="empty-icon">📖</view>
+        <view>还没有借阅记录</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,45 @@
+<template name="borrowItem">
+  <view class="card borrow-card">
+    <view class="borrow-head flex-between">
+      <view class="borrow-title-group">
+        <text class="borrow-title ellipsis">{{item.bookTitle}}</text>
+        <text wx:if="{{item.location}}" class="borrow-loc">　馆藏：{{item.location}}</text>
+      </view>
+      <view class="tag {{item.statusInfo.cls}}">{{item.statusInfo.text}}</view>
+    </view>
+    <view class="borrow-meta">
+      <text>申请日期：{{item.borrowDateText}}</text>
+      <text wx:if="{{item.status === 'pending' && item.scheduledPickupDateText}}">预约取书：{{item.scheduledPickupDateText}}</text>
+      <text wx:elif="{{item.deliverDateText}}">借出日期：{{item.deliverDateText}}</text>
+    </view>
+    <view class="borrow-meta">
+      <block wx:if="{{item.status === 'returned'}}">
+        <text wx:if="{{item.dueDateText}}">应还日期：{{item.dueDateText}}</text>
+        <text>归还日期：{{item.returnDateText}}</text>
+      </block>
+      <block wx:elif="{{item.status === 'return_requested'}}">
+        <text wx:if="{{item.dueDateText}}">应还日期：{{item.dueDateText}}</text>
+        <text wx:if="{{item.scheduledReturnDateText}}">预约还书：{{item.scheduledReturnDateText}}</text>
+      </block>
+      <block wx:elif="{{item.status !== 'pending'}}">
+        <text wx:if="{{item.scheduledReturnDateText}}">预约还书：{{item.scheduledReturnDateText}}</text>
+        <text wx:if="{{item.dueDateText}}">应还日期：{{item.dueDateText}}</text>
+      </block>
+    </view>
+    <view wx:if="{{item.status === 'pending'}}" class="borrow-status-tip">等待管理员确认借出，确认后到馆藏地点线下领取</view>
+    <view wx:if="{{!readonly && item.status === 'pending'}}" class="borrow-actions">
+      <view class="cancel-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onCancelBorrow">取消申请</view>
+    </view>
+    <view wx:if="{{item.status === 'return_requested'}}" class="borrow-status-tip">已提交归还申请，等待管理员线下回收确认</view>
+    <view wx:if="{{!readonly && item.status === 'return_requested'}}" class="borrow-actions">
+      <view class="cancel-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onCancelReturn">取消还书申请</view>
+    </view>
+    <block wx:if="{{item.status === 'borrowing' || item.status === 'overdue'}}">
+      <view wx:if="{{item.renewTip}}" class="borrow-status-tip">{{item.renewTip}}</view>
+      <view wx:if="{{!readonly}}" class="borrow-actions">
+        <view wx:if="{{item.canRenew}}" class="return-btn renew-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onRenew">申请续借</view>
+        <view class="return-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" data-location="{{item.location}}" bindtap="onRequestReturn">预约还书</view>
+      </view>
+    </block>
+  </view>
+</template>

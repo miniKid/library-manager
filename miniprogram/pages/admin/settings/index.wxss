@@ -1,0 +1,82 @@
+.page { padding: 24rpx; }
+
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 20rpx;
+}
+
+.loc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f2f5;
+}
+.loc-row:last-child { border-bottom: none; }
+.loc-name { font-size: 28rpx; color: #333; }
+.loc-del {
+  font-size: 24rpx;
+  color: #E54D42;
+  padding: 8rpx 16rpx;
+  background: #FDEBEA;
+  border-radius: 8rpx;
+}
+
+.loc-add {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+  gap: 16rpx;
+}
+.loc-input {
+  flex: 1;
+  min-width: 0;
+  border: 1rpx solid #eee;
+  border-radius: 8rpx;
+  padding: 14rpx 16rpx;
+  font-size: 26rpx;
+  background: #fafafa;
+}
+.loc-add-btn {
+  flex-shrink: 0;
+  padding: 12rpx 32rpx;
+  background: #4a7dff;
+  color: #fff;
+  font-size: 26rpx;
+  border-radius: 32rpx;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #f5f6f8;
+}
+.form-item:last-child { border-bottom: none; }
+.form-label {
+  width: 320rpx;
+  font-size: 28rpx;
+  color: #333;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.form-input {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 28rpx;
+}
+
+.save-btn {
+  margin-top: 8rpx;
+  box-shadow: 0 6rpx 20rpx rgba(43, 91, 132, 0.3);
+}

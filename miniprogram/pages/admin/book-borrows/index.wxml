@@ -1,0 +1,27 @@
+<view class="page">
+  <!-- 状态筛选 -->
+  <view class="filters">
+    <view
+      wx:for="{{filters}}"
+      wx:key="key"
+      class="filter {{activeFilter === item.key ? 'filter-on' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onFilter"
+    >{{item.label}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中…</view>
+  <view wx:elif="{{filtered.length === 0}}" class="empty">暂无借阅记录</view>
+
+  <view wx:else class="list">
+    <view wx:for="{{filtered}}" wx:key="_id" class="item">
+      <view class="item-line">
+        <text class="item-user">{{item.userName || '未知用户'}}</text>
+        <text class="item-status status-{{item.status}}">{{item.statusText}}</text>
+      </view>
+      <view class="item-sub">申请日期：{{item.borrowDateText || '—'}}　借出日期：{{item.deliverDateText || '—'}}</view>
+      <view class="item-sub">应还日期：{{item.dueDateText || '—'}}　归还日期：{{item.returnDateText || '—'}}</view>
+      <view class="item-sub" wx:if="{{item.status === 'cancelled'}}">已取消</view>
+    </view>
+  </view>
+</view>

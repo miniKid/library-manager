@@ -1,0 +1,25 @@
+# ===== 微信开发者工具：本地私钥与个性化配置（含上传私钥，严禁提交） =====
+project.private.config.json
+
+# ===== 编译产物 / 依赖 =====
+miniprogram_npm/
+node_modules/
+cloudfunctions/**/node_modules/
+
+# ===== 日志与系统文件 =====
+*.log
+logs/
+.DS_Store
+
+# ===== 本地密钥文件 =====
+*.key
+private.*.key
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+
+# ===== 测试覆盖率产物 =====
+coverage/
+.nyc_output/

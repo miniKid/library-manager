@@ -1,0 +1,58 @@
+<view class="page">
+  <view class="logo">
+    <text class="logo-icon">📚</text>
+    <view class="logo-title">云图图书馆</view>
+    <view class="logo-sub">在线借阅，随时阅读</view>
+  </view>
+
+  <block wx:if="{{ready}}">
+    <!-- 首次：填写头像昵称 -->
+    <view wx:if="{{needProfile}}" class="card form-card">
+      <view class="avatar-row">
+        <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+          <image wx:if="{{avatarUrl}}" src="{{avatarUrl}}" class="avatar-img" />
+          <view wx:else class="avatar-placeholder">
+            <text class="avatar-plus">＋</text>
+            <text class="avatar-tip">选择头像</text>
+          </view>
+        </button>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">昵称</text>
+        <input
+          class="form-input"
+          type="nickname"
+          placeholder="请输入昵称"
+          value="{{nickname}}"
+          bindinput="onNicknameInput"
+        />
+      </view>
+
+      <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{submitting}}">
+        登录
+      </button>
+
+      <view class="tip">登录即代表同意以微信身份使用本图书馆服务</view>
+    </view>
+
+    <!-- 老用户：直接微信登录 -->
+    <view wx:else class="card form-card">
+      <view class="avatar-row">
+        <view class="avatar-static">
+          <image wx:if="{{preview.avatarUrl}}" src="{{preview.avatarUrl}}" class="avatar-img" />
+          <text wx:else class="avatar-plus">&#128100;</text>
+        </view>
+      </view>
+      <view class="welcome">欢迎回来，{{preview.nickname}}</view>
+      <button class="btn-primary submit-btn" bindtap="onSubmit" loading="{{submitting}}">
+        微信登录
+      </button>
+      <view class="tip">如需修改头像或昵称，请登录后到「我的 → 修改资料」中更改</view>
+    </view>
+  </block>
+
+  <view wx:else class="card form-card loading-card">
+    <view class="loading-tip">加载中…</view>
+  </view>
+</view>

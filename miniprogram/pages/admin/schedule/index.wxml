@@ -1,0 +1,77 @@
+<view class="page safe-bottom">
+  <!-- 馆藏地点切换 -->
+  <view class="loc-bar">
+    <scroll-view scroll-x class="loc-scroll" wx:if="{{locations.length}}">
+      <view
+        wx:for="{{locations}}"
+        wx:key="*this"
+        class="loc-tab {{item === activeLocation ? 'loc-tab-active' : ''}}"
+        data-location="{{item}}"
+        bindtap="switchLocation"
+      >{{item}}</view>
+    </scroll-view>
+    <view wx:else class="loc-empty">请先在「馆藏设置」中添加馆藏地点</view>
+  </view>
+
+  <block wx:if="{{activeLocation}}">
+    <!-- 每周快速设置 -->
+    <view class="card section">
+      <view class="section-title">每周值班</view>
+      <view class="section-tip">按周设置固定值班日，快速生效</view>
+      <view class="week-list">
+        <view
+          wx:for="{{weekly}}"
+          wx:key="index"
+          class="week-item {{item ? 'week-on' : 'week-off'}}"
+          data-idx="{{index}}"
+          bindtap="onToggleWeekly"
+        >
+          <text class="week-name">{{index === 0 ? '一' : index === 1 ? '二' : index === 2 ? '三' : index === 3 ? '四' : index === 4 ? '五' : index === 5 ? '六' : '日'}}</text>
+          <view class="week-switch {{item ? 'switch-on' : ''}}">
+            <view class="switch-dot"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 日历日期设置 -->
+    <view class="card section">
+      <view class="cal-head">
+        <view class="cal-nav" bindtap="prevMonth">‹</view>
+        <view class="cal-title">{{monthLabel}}</view>
+        <view class="cal-nav" bindtap="nextMonth">›</view>
+      </view>
+      <view class="section-tip">点击日期切换「可选（有人值班）/ 不可选（无人值班）」，灰色点为单日覆盖</view>
+      <view class="cal-week-head">
+        <view wx:for="{{calendar.weeks[0]}}" wx:key="index" class="cal-week-cell">
+          {{index === 0 ? '一' : index === 1 ? '二' : index === 2 ? '三' : index === 3 ? '四' : index === 4 ? '五' : index === 5 ? '六' : '日'}}
+        </view>
+      </view>
+      <view class="cal-grid" wx:for="{{calendar.weeks}}" wx:key="index" wx:for-item="week">
+        <view
+          wx:for="{{week}}"
+          wx:key="index"
+          wx:for-item="d"
+          class="cal-cell {{d ? (d.available ? 'cal-avail' : 'cal-dis') : 'cal-empty'}}"
+          data-date="{{d.date}}"
+          bindtap="onToggleDay"
+        >
+          <block wx:if="{{d}}">
+            <text class="cal-day">{{d.day}}</text>
+            <view class="cal-dot {{d.override ? 'cal-dot-show' : ''}}"></view>
+          </block>
+        </view>
+      </view>
+      <view class="legend">
+        <view class="legend-item"><view class="legend-box box-avail"></view>可选（有人值班）</view>
+        <view class="legend-item"><view class="legend-box box-dis"></view>不可选（无人值班）</view>
+        <view class="legend-item"><view class="legend-dot"></view>单日覆盖</view>
+      </view>
+    </view>
+
+    <!-- 保存 -->
+    <button class="save-btn" bindtap="onSave" disabled="{{saving || !dirty}}">
+      {{saving ? '保存中...' : dirty ? '保存该地点值班安排' : '已保存，无未保存修改'}}
+    </button>
+  </block>
+</view>

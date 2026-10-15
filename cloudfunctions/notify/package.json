@@ -1,0 +1,9 @@
+{
+  "name": "notify",
+  "version": "1.0.0",
+  "description": "定时扫描临期/逾期的借阅并推送「图书到期提醒」订阅消息",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

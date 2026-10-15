@@ -1,0 +1,12 @@
+{
+  "name": "library-miniprogram",
+  "version": "1.0.0",
+  "private": true,
+  "description": "图书管理小程序（本地 mock + 微信云开发双模式）",
+  "scripts": {
+    "test": "node test/run-tests.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

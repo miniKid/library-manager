@@ -1,0 +1,83 @@
+<view class="page">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <text class="search-icon">🔍</text>
+    <input
+      class="search-input"
+      placeholder="搜索书名 / 作者 / ISBN"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+      bindconfirm="onSearch"
+      confirm-type="search"
+    />
+    <text wx:if="{{keyword}}" class="search-clear" bindtap="onClearKeyword">✕</text>
+  </view>
+
+  <!-- 馆藏地点可借筛选 -->
+  <view class="filter-bar">
+    <view
+      class="filter-item {{activeLocation === '' ? 'filter-active' : ''}}"
+      data-loc=""
+      bindtap="onFilter"
+    >全部</view>
+    <view
+      wx:for="{{locations}}"
+      wx:key="*this"
+      class="filter-item {{activeLocation === item ? 'filter-active' : ''}}"
+      data-loc="{{item}}"
+      bindtap="onFilter"
+    >{{item}}可借</view>
+  </view>
+
+  <!-- 图书列表 -->
+  <view class="container" wx:if="{{books.length > 0}}">
+    <view
+      wx:for="{{books}}"
+      wx:key="_id"
+      class="book-card"
+      data-id="{{item._id}}"
+      bindtap="goDetail"
+    >
+      <view class="book-cover" style="background: {{item.coverBg}}">
+        <view wx:if="{{item.cover}}" class="book-cover-img">
+          <image src="{{item.cover}}" mode="aspectFill" />
+        </view>
+        <text wx:else class="book-cover-text">{{item.coverChar}}</text>
+      </view>
+      <view class="book-info">
+        <view class="book-title ellipsis">{{item.title}}</view>
+        <view class="book-author ellipsis">{{item.author}}</view>
+        <view class="book-meta">
+          <view class="tag tag-blue">{{item.category}}</view>
+          <view class="tag {{item.status === 'available' ? 'tag-green' : (item.status === 'unstocked' ? 'tag-gray' : 'tag-red')}}}">{{item.status === 'available' ? '可借' : (item.status === 'unstocked' ? '待配馆藏' : '借出')}}</view>
+        </view>
+        <view class="book-stocks" wx:if="{{item.stockChips && item.stockChips.length}}">
+          <text
+            wx:for="{{item.stockChips}}"
+            wx:key="loc"
+            class="stock-chip {{item.num > 0 ? 'stock-chip-on' : 'stock-chip-off'}}"
+          >{{item.loc}} {{item.num}}</text>
+        </view>
+      </view>
+      <view class="book-arrow">›</view>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="load-more" wx:if="{{books.length > 0}}">
+      <text wx:if="{{loading}}">加载中...</text>
+      <text wx:elif="{{finished}}">— 已加载全部 {{total}} 本 —</text>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty" wx:elif="{{!loading}}">
+    <view class="empty-icon">📚</view>
+    <view>没有找到相关图书</view>
+  </view>
+
+  <!-- 未登录提示 -->
+  <view wx:if="{{!logged}}" class="login-tip safe-bottom" bindtap="goLogin">
+    <text>登录后可在线借阅图书</text>
+    <text class="login-tip-btn">去登录</text>
+  </view>
+</view>

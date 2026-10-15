@@ -1,0 +1,68 @@
+<view class="page safe-bottom">
+  <!-- 筛选 -->
+  <view class="filters">
+    <view
+      wx:for="{{filters}}"
+      wx:key="key"
+      class="filter {{activeFilter === item.key ? 'filter-on' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onFilter"
+    >{{item.label}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card">
+    <view class="empty">
+      <view class="empty-icon">⏳</view>
+      <view>加载中…</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{filtered.length === 0}}" class="card">
+    <view class="empty">
+      <view class="empty-icon">👥</view>
+      <view>{{users.length === 0 ? '暂无注册用户' : '当前筛选无匹配用户'}}</view>
+    </view>
+  </view>
+
+  <view wx:else>
+  <view wx:for="{{filtered}}" wx:key="_id" class="card user-item">
+    <view class="user-row">
+      <view class="avatar">
+        <image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" class="avatar-img" />
+        <text wx:else class="avatar-text">{{item.coverChar}}</text>
+      </view>
+      <view class="user-info">
+        <view class="user-name ellipsis">
+          {{item.nickname}}
+          <view class="tag {{item.isAdmin ? 'tag-orange' : 'tag-blue'}}" style="margin-left: 12rpx;">{{item.isAdmin ? '管理员' : '读者'}}</view>
+          <view wx:if="{{item.isSelf}}" class="tag tag-green" style="margin-left: 12rpx;">当前</view>
+        </view>
+        <view class="user-id">ID: {{item.openid}}</view>
+      </view>
+    </view>
+
+    <!-- 借书证状态 -->
+    <view class="card-status-row">
+      <view class="tag card-status-tag {{item.cardStatus === 'active' ? 'tag-green' : (item.cardStatus === 'pending' ? 'tag-orange' : (item.cardStatus === 'rejected' ? 'tag-red' : 'tag-blue'))}}">{{item.cardText}}</view>
+      <text class="card-status-desc">{{item.cardDesc}}</text>
+    </view>
+
+    <!-- 操作区 -->
+    <view class="member-actions">
+      <!-- 借书证审批 -->
+      <block wx:if="{{item.cardStatus === 'pending'}}">
+        <view class="mini-btn mini-btn-ok" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onApprove">通过</view>
+        <view class="mini-btn mini-btn-no" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onReject">驳回</view>
+      </block>
+      <!-- 角色升降 -->
+      <block wx:if="{{item.isAdmin}}">
+        <view wx:if="{{!item.isSelf}}" class="mini-btn" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onDemote">降级为读者</view>
+        <view wx:else class="mini-btn mini-btn-dis">当前账号（不可降级自己）</view>
+      </block>
+      <view wx:else class="mini-btn" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onPromote">设为管理员</view>
+      <!-- 剔除借书证：管理员亦须持卡借阅，其借书证同样可移除（不影响管理角色），仅自己不可操作 -->
+      <view wx:if="{{!item.isSelf && item.cardStatus === 'active'}}" class="mini-btn mini-btn-danger" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onRemoveCard">移除借书证</view>
+    </view>
+  </view>
+  </view>
+</view>
