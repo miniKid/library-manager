@@ -845,9 +845,22 @@ async function getBorrowsByBook(bookId) {
 }
 
 /** 用户列表（管理端） */
-async function getUsers() {
+async function getUsers({ keyword = '', role = '', cardStatus = '', page = 1, pageSize = 20 } = {}) {
   const db = getDb();
-  return db.users.slice();
+  let list = db.users.slice();
+  if (role) list = list.filter((u) => u.role === role);
+  if (cardStatus) list = list.filter((u) => (u.card && u.card.status) === cardStatus);
+  if (keyword) {
+    const kw = String(keyword).trim().toLowerCase();
+    if (kw) list = list.filter((u) => (u.nickname || '').toLowerCase().indexOf(kw) !== -1);
+  }
+  const total = list.length;
+  const size = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 100);
+  const p = Math.max(parseInt(page, 10) || 1, 1);
+  list = list
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice((p - 1) * size, p * size);
+  return { list, total };
 }
 
 /** 设置用户角色 */

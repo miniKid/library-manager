@@ -378,16 +378,17 @@ async function getBookOccupied(bookId) {
   }
 }
 
-/** 用户列表（管理端）：云函数校验管理员后返回 */
-async function getUsers() {
+/** 用户列表（管理端）：云函数校验管理员后返回，支持关键词/角色/借书证状态过滤与分页 */
+async function getUsers({ keyword = '', role = '', cardStatus = '', page = 1, pageSize = 20 } = {}) {
   try {
     const res = await wx.cloud.callFunction({
       name: 'borrowManager',
-      data: { action: 'users' }
+      data: { action: 'users', keyword, role, cardStatus, page, pageSize }
     });
-    return (res.result && res.result.data && res.result.data.list) || [];
+    const data = (res.result && res.result.data) || {};
+    return { list: data.list || [], total: data.total || 0 };
   } catch (e) {
-    return [];
+    return { list: [], total: 0 };
   }
 }
 

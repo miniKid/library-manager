@@ -777,9 +777,22 @@ async function doDemoteAdmin(event) {
 }
 
 /** 用户列表（管理员） */
-async function doGetUsers() {
-  const r = await db.collection('users').orderBy('createdAt', 'desc').limit(100).get();
-  return { ok: true, data: { list: r.data } };
+async function doGetUsers(event = {}) {
+  const { keyword = '', role = '', cardStatus = '', page = 1, pageSize = 20 } = event;
+  const where = {};
+  if (role) where.role = role;
+  if (cardStatus) where['card.status'] = cardStatus;
+  if (keyword) {
+    // 转义正则特殊字符，避免用户输入 ()[] 等导致正则报错
+    const escaped = String(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    where.nickname = db.RegExp({ regexp: escaped, options: 'i' });
+  }
+  const size = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 100);
+  const p = Math.max(parseInt(page, 10) || 1, 1);
+  const coll = db.collection('users').where(where);
+  const countRes = await coll.count();
+  const r = await coll.orderBy('createdAt', 'desc').skip((p - 1) * size).limit(size).get();
+  return { ok: true, data: { list: r.data, total: countRes.total } };
 }
 
 /** 借阅人续借：逾期前自主申请，延长应还日期（按馆藏设置续借次数与天数） */
@@ -857,7 +870,7 @@ exports.main = async (event) => {
       // ---- 用户 / 借书证管理 ----
       case 'users':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
-        return await doGetUsers();
+        return await doGetUsers(event);
       case 'applyCard':
         return await doApplyCard(event, OPENID);
       case 'updateCardLocation':

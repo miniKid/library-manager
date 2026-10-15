@@ -1,5 +1,19 @@
 .page { padding: 24rpx; }
 
+/* 搜索栏 */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 40rpx;
+  padding: 12rpx 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+.search-icon { margin-right: 12rpx; font-size: 30rpx; }
+.search-input { flex: 1; font-size: 28rpx; }
+.search-clear { color: #C0C4CC; padding: 8rpx 0 8rpx 16rpx; font-size: 28rpx; }
+
 /* 筛选条 */
 .filters { display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 20rpx; }
 .filter {
@@ -12,6 +26,15 @@
 .filter-on { background: var(--c-primary); color: #fff; }
 
 .user-item { padding: 24rpx; }
+
+/* 列表底部加载更多 */
+.list-more {
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
+  padding: 24rpx 0 8rpx;
+}
+.list-more-end { color: #bbb; }
 .user-row { display: flex; align-items: center; }
 .avatar {
   width: 88rpx;
