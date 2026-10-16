@@ -23,7 +23,8 @@ const ROLE = { ADMIN: 'admin', USER: 'user' };
 // 订阅消息模板 ID（与公众平台「订阅消息」中创建的一致，均为一次性订阅）
 const TMPL = {
   BORROW_OK: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4',     // 借阅成功通知
-  RETURN_REMIND: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM'  // 图书到期提醒
+  RETURN_REMIND: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM',  // 图书到期提醒（定时）
+  OVERDUE_REMIND: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo'  // 逾期提醒（管理员手动触发）
 };
 // 跳转版本：开发工具内调试用 'developer'，正式发布后改为 'formal'
 const MP_STATE = 'developer';
@@ -569,6 +570,44 @@ async function sendBorrowOk(record) {
   }
 }
 
+/** 管理员手动发送「逾期提醒」给借阅人（新模板 OVERDUE_REMIND，需借阅人此前已授权，可多次授权累加次数）
+ *  thing1=书籍名称，short_thing4=逾期天数，thing5=固定文案「你借出书籍已逾期，请尽快提交还书订单」
+ *  失败 43101 表示用户未订阅/次数用尽，返回明确提示由前端转达。
+ */
+async function doSendOverdueRemind(event = {}) {
+  const borrowId = event.borrowId;
+  if (!borrowId) return { ok: false, msg: '缺少借阅记录 ID' };
+  const rec = await db.collection('borrows').doc(borrowId).get();
+  const record = rec && rec.data;
+  if (!record) return { ok: false, msg: '借阅记录不存在' };
+  if (!record.userId) return { ok: false, msg: '该记录缺少借阅人信息' };
+  const due = new Date(record.dueDate);
+  const days = Math.max(0, Math.ceil((Date.now() - due.getTime()) / 86400000));
+  try {
+    await cloud.openapi.subscribeMessage.send({
+      touser: record.userId,
+      templateId: TMPL.OVERDUE_REMIND,
+      page: 'pages/my/index',            // 点击消息进入「我的」页
+      miniprogram_state: MP_STATE,
+      lang: 'zh_CN',
+      // 字段名需与模板关键词一致（thing1/short_thing4/thing5），否则报 47003
+      data: {
+        thing1: { value: String(record.bookTitle || '图书').slice(0, 20) },
+        short_thing4: { value: String(days) },
+        thing5: { value: '你借出书籍已逾期，请尽快提交还书订单' }
+      }
+    });
+    return { ok: true };
+  } catch (e) {
+    const code = e && e.errCode;
+    const msg = (e && e.errMsg) || '';
+    if (code === 43101 || /43101/.test(msg)) {
+      return { ok: false, code: 'NO_GRANT', msg: '该用户未订阅或订阅次数已用完' };
+    }
+    return { ok: false, msg: '发送失败：' + (msg || code || '未知错误') };
+  }
+}
+
 /** 我的借阅：按当前用户 openid 查询（借出中且已过应还日期派生为已逾期） */
 async function doMyBorrows(openid) {
   if (!openid) return [];
@@ -789,10 +828,52 @@ async function doGetUsers(event = {}) {
   }
   const size = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 100);
   const p = Math.max(parseInt(page, 10) || 1, 1);
-  const coll = db.collection('users').where(where);
+  const coll = db.collection('users').field({ avatarUrl: false }).where(where);
   const countRes = await coll.count();
   const r = await coll.orderBy('createdAt', 'desc').skip((p - 1) * size).limit(size).get();
   return { ok: true, data: { list: r.data, total: countRes.total } };
+}
+
+// ============ 临时：批量写入 mock 用户（仅供测试用户管理页，测试完毕后请删除本函数及对应 case） ============
+async function doSeedMockUsers(event = {}) {
+  if (event.clear) {
+    for (;;) {
+      const list = await db.collection('users').where({ openid: db.RegExp({ regexp: '^seed_' }) }).limit(100).get();
+      if (!list.data.length) break;
+      await db.collection('users').where({ openid: db.RegExp({ regexp: '^seed_' }) }).remove();
+    }
+    return { ok: true, cleared: true };
+  }
+  const count = Math.min(Math.max(parseInt(event.count, 10) || 30, 1), 300);
+  const settings = await getSettings();
+  const locs = (settings && settings.locations) || ['广州', '西安'];
+  const surnames = '赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜'.split('');
+  const givens = '伟芳娜秀英敏静丽强磊洋勇艳杰娟涛明超霞平刚桂兰建华文辉'.split('');
+  const statusPool = ['active', 'pending', 'none', 'rejected'];
+  const baseTs = Date.now();
+  const docs = [];
+  for (let i = 0; i < count; i++) {
+    const name = surnames[i % surnames.length] + givens[(i * 5) % givens.length] + (i >= 20 ? i : '');
+    const status = statusPool[i % statusPool.length];
+    const ts = new Date(baseTs - (count - i) * 60000);
+    docs.push({
+      openid: 'seed_' + baseTs.toString(36) + '_' + i,
+      nickname: name,
+      role: i < 3 ? ROLE.ADMIN : ROLE.USER,
+      avatarUrl: '',
+      createdAt: ts,
+      card: {
+        status,
+        location: locs[i % locs.length],
+        phone: status === 'none' ? '' : '138' + String(10000000 + (i * 137 % 90000000)).padStart(8, '0'),
+        applyDate: status === 'none' ? null : ts
+      }
+    });
+  }
+  for (let i = 0; i < docs.length; i += 50) {
+    await db.collection('users').add({ data: docs.slice(i, i + 50) });
+  }
+  return { ok: true, inserted: docs.length };
 }
 
 /** 借阅人续借：逾期前自主申请，延长应还日期（按馆藏设置续借次数与天数） */
@@ -890,6 +971,13 @@ exports.main = async (event) => {
       case 'demoteAdmin':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
         return await doDemoteAdmin(event);
+      // 管理员手动发送「逾期提醒」（新模板，需用户此前已授权）
+      case 'sendOverdueRemind':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doSendOverdueRemind(event);
+      // 临时：批量写入/清空 mock 用户（测试用，测试完删除）
+      case 'seedMockUsers':
+        return await doSeedMockUsers(event);
       default:
         return { ok: false, msg: '未知操作' };
     }

@@ -132,5 +132,27 @@ Page({
         }
       }
     });
+  },
+
+  /** 管理员手动发送逾期提醒订阅消息给借阅人 */
+  onSendOverdueRemind(e) {
+    const { id, bookTitle } = e.currentTarget.dataset;
+    wx.showModal({
+      title: '逾期提醒',
+      content: '向《' + bookTitle + '》借阅人发送逾期提醒订阅消息？',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '发送中' });
+        const result = await services.sendOverdueRemind(id);
+        wx.hideLoading();
+        if (result && result.ok) {
+          wx.showToast({ title: '已发送逾期提醒', icon: 'success' });
+        } else if (result && result.code === 'NO_GRANT') {
+          wx.showModal({ title: '无法发送', content: (result.msg || '该用户未订阅逾期提醒'), showCancel: false });
+        } else {
+          wx.showToast({ title: (result && result.msg) || '发送失败', icon: 'none' });
+        }
+      }
+    });
   }
 });

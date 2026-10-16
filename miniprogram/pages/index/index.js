@@ -102,10 +102,6 @@ Page({
     }
   },
 
-  onPullDownRefresh() {
-    this.loadBooks(true).then(() => wx.stopPullDownRefresh());
-  },
-
   onReachBottom() {
     if (!this.data.finished && !this.data.loading) {
       this.loadBooks(false);

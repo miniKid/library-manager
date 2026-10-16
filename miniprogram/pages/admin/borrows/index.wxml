@@ -45,5 +45,10 @@
         确认归还
       </view>
     </view>
+    <view wx:if="{{item.status === 'overdue'}}" class="borrow-actions">
+      <view class="remind-btn" data-id="{{item._id}}" data-book-title="{{item.bookTitle}}" bindtap="onSendOverdueRemind">
+        逾期提醒
+      </view>
+    </view>
   </view>
 </view>

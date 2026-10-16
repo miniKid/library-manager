@@ -36,20 +36,6 @@
 }
 .list-more-end { color: #bbb; }
 .user-row { display: flex; align-items: center; }
-.avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: #E8ECF1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-.avatar-img { width: 88rpx; height: 88rpx; }
-.avatar-text { color: #8A8F99; font-size: 32rpx; font-weight: 600; }
 .user-info { flex: 1; min-width: 0; }
 .user-name { font-size: 30rpx; font-weight: 600; }
 .user-id { font-size: 22rpx; color: #999; margin-top: 6rpx; }

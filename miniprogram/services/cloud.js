@@ -296,6 +296,19 @@ async function renewBorrow(borrowId) {
   }
 }
 
+/** 管理员手动发送「逾期提醒」给借阅人（云函数执行，需用户此前已授权） */
+async function sendOverdueRemind(borrowId) {
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'sendOverdueRemind', borrowId }
+    });
+    return res.result || { ok: false, msg: '发送失败' };
+  } catch (e) {
+    return handleError(e);
+  }
+}
+
 /** 我的借阅：由云函数按当前 openid 查询（客户端无 openid 权限） */
 async function getMyBorrows() {
   try {
@@ -532,6 +545,7 @@ module.exports = {
   cancelBorrow,
   cancelReturn,
   renewBorrow,
+  sendOverdueRemind,
   returnBook,
   getMyBorrows,
   getBorrows,

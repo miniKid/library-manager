@@ -24,30 +24,44 @@
     </view>
   </view>
 
-  <view wx:elif="{{books.length === 0 && !loading}}" class="card">
-    <view class="empty">
-      <view class="empty-icon">📚</view>
-      <view>暂无图书，点击上方按钮新增</view>
+  <block wx:elif="{{books.length === 0}}">
+    <view wx:if="{{loading}}" class="card">
+      <view class="empty">
+        <view class="empty-icon">⏳</view>
+        <view>加载中…</view>
+      </view>
     </view>
-  </view>
+    <view wx:else class="card">
+      <view class="empty">
+        <view class="empty-icon">📚</view>
+        <view>{{keyword ? '未找到相关图书' : '暂无图书，点击上方按钮新增'}}</view>
+      </view>
+    </view>
+  </block>
 
-  <view wx:for="{{books}}" wx:key="_id" class="card book-item">
-    <view class="book-cover" style="background: {{item.coverBg}}">
-      <view wx:if="{{item.cover}}">
-        <image src="{{item.cover}}" mode="aspectFill" class="cover-img" />
+  <block wx:else>
+    <view wx:for="{{books}}" wx:key="_id" class="card book-item">
+      <view class="book-cover" style="background: {{item.coverBg}}">
+        <view wx:if="{{item.cover}}">
+          <image src="{{item.cover}}" mode="aspectFill" class="cover-img" />
+        </view>
+        <text wx:else class="cover-text">{{item.coverChar}}</text>
       </view>
-      <text wx:else class="cover-text">{{item.coverChar}}</text>
-    </view>
-    <view class="book-info">
-      <view class="book-title ellipsis">{{item.title}}</view>
-      <view class="book-author ellipsis">{{item.author}}</view>
-      <view class="book-stocks" wx:if="{{item.stockChips && item.stockChips.length}}">
-        <text wx:for="{{item.stockChips}}" wx:key="loc" class="stock-chip">{{item.loc}} {{item.num}}</text>
+      <view class="book-info">
+        <view class="book-title ellipsis">{{item.title}}</view>
+        <view class="book-author ellipsis">{{item.author}}</view>
+        <view class="book-stocks" wx:if="{{item.stockChips && item.stockChips.length}}">
+          <text wx:for="{{item.stockChips}}" wx:key="loc" class="stock-chip">{{item.loc}} {{item.num}}</text>
+        </view>
+      </view>
+      <view class="book-actions">
+        <view class="act-btn act-edit" data-id="{{item._id}}" bindtap="goEdit">编辑</view>
+        <view class="act-btn act-del" data-id="{{item._id}}" data-title="{{item.title}}" bindtap="onDelete">删除</view>
       </view>
     </view>
-    <view class="book-actions">
-      <view class="act-btn act-edit" data-id="{{item._id}}" bindtap="goEdit">编辑</view>
-      <view class="act-btn act-del" data-id="{{item._id}}" data-title="{{item.title}}" bindtap="onDelete">删除</view>
+    <view class="load-more">
+      <view wx:if="{{loading}}" class="lm-tip">加载中…</view>
+      <view wx:elif="{{finished}}" class="lm-tip">没有更多了</view>
     </view>
-  </view>
+  </block>
 </view>

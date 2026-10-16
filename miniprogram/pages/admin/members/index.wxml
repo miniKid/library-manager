@@ -24,7 +24,7 @@
     >{{item.label}}</view>
   </view>
 
-  <view wx:if="{{loading}}" class="card">
+  <view wx:if="{{loading && filtered.length === 0}}" class="card">
     <view class="empty">
       <view class="empty-icon">⏳</view>
       <view>加载中…</view>
@@ -41,10 +41,6 @@
   <view wx:else>
   <view wx:for="{{filtered}}" wx:key="_id" class="card user-item">
     <view class="user-row">
-      <view class="avatar">
-        <image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" class="avatar-img" />
-        <text wx:else class="avatar-text">{{item.coverChar}}</text>
-      </view>
       <view class="user-info">
         <view class="user-name ellipsis">
           {{item.nickname}}
@@ -77,7 +73,7 @@
       <view wx:if="{{!item.isSelf && item.cardStatus === 'active'}}" class="mini-btn mini-btn-danger" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onRemoveCard">移除借书证</view>
     </view>
   </view>
-    <view wx:if="{{hasMore}}" class="list-more">{{loadingMore ? '加载中…' : '上拉加载更多'}}</view>
-    <view wx:elif="{{users.length > 0}}" class="list-more list-more-end">— 没有更多了 —</view>
+    <view wx:if="{{loading}}" class="list-more">加载中…</view>
+    <view wx:elif="{{finished}}" class="list-more list-more-end">— 没有更多了 —</view>
   </view>
 </view>

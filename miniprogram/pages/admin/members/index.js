@@ -7,8 +7,7 @@ Page({
     users: [],
     filtered: [],
     loading: false,
-    loadingMore: false,
-    hasMore: false,
+    finished: false,
     total: 0,
     page: 1,
     pageSize: 20,
@@ -38,30 +37,37 @@ Page({
   },
 
   async loadUsers(reset = true) {
-    const page = reset ? 1 : this.data.page + 1;
-    const base = reset ? [] : this.data.users;
-    this.setData({ loading: reset, loadingMore: !reset, page });
+    if (this.data.loading) return;
+    const page = reset ? 1 : this.data.page;
+    this.setData({ loading: true });
     const role = this.data.activeFilter === 'admin' ? ROLE.ADMIN
       : this.data.activeFilter === 'reader' ? ROLE.USER : '';
     const cardStatus = this.data.activeFilter === 'pending' ? CARD_STATUS.PENDING : '';
-    const res = await services.getUsers({
-      keyword: this.data.keyword.trim(),
-      role,
-      cardStatus,
-      page,
-      pageSize: this.data.pageSize
-    });
-    const list = (res && res.list) || [];
-    const total = (res && res.total) || 0;
-    const users = base.concat(list.map((u) => this.mapUser(u)));
-    this.setData({
-      users,
-      filtered: users,
-      loading: false,
-      loadingMore: false,
-      hasMore: users.length < total,
-      total
-    });
+    try {
+      const res = await services.getUsers({
+        keyword: this.data.keyword.trim(),
+        role,
+        cardStatus,
+        page,
+        pageSize: this.data.pageSize
+      });
+      const list = (res && res.list) || [];
+      const total = (res && res.total) || 0;
+      const mapped = list.map((u) => this.mapUser(u));
+      const nextUsers = reset ? mapped : this.data.users.concat(mapped);
+      this.setData({
+        users: nextUsers,
+        filtered: nextUsers,
+        page: page + 1,
+        total,
+        finished: page * this.data.pageSize >= total,
+        loading: false
+      });
+    } catch (e) {
+      console.error('[admin/members] loadUsers error:', e);
+      this.setData({ loading: false });
+      wx.showToast({ title: '加载失败', icon: 'none' });
+    }
   },
 
   mapUser(u) {
@@ -89,18 +95,16 @@ Page({
       _id: u._id,
       openid: u.openid,
       nickname: u.nickname || '微信用户',
-      avatarUrl: u.avatarUrl || '',
       isAdmin,
       isSelf: u.openid === this.data.selfOpenid,
       cardStatus: status,
       cardText,
-      cardDesc,
-      coverChar: (u.nickname || '微').charAt(0)
+      cardDesc
     };
   },
 
   onReachBottom() {
-    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
+    if (!this.data.finished && !this.data.loading) {
       this.loadUsers(false);
     }
   },

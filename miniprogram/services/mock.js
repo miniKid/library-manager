@@ -904,6 +904,11 @@ async function getStats() {
   };
 }
 
+/** 管理员手动发送「逾期提醒」（模拟模式无真实订阅，直接返回成功） */
+async function sendOverdueRemind() {
+  return { ok: true };
+}
+
 module.exports = {
   init,
   login,
@@ -941,5 +946,6 @@ module.exports = {
   getSettings,
   saveSettings,
   getSchedules,
-  saveSchedule
+  saveSchedule,
+  sendOverdueRemind
 };
