@@ -22,7 +22,9 @@
 | 模式 | 配置 | 说明 |
 |---|---|---|
 | 本地模拟 | `useCloud: false` | 数据存于小程序本地缓存，不需要 AppID 和云环境，改完直接编译就能点完整流程 |
-| 云开发 | `useCloud: true` | 云数据库 + 云函数，真实上线用；仓库当前默认此模式，`cloudEnv` 需填自己的环境 ID |
+| 云开发 | `useCloud: true` | 云数据库 + 云函数，真实上线用；`cloudEnv` 需填自己的环境 ID |
+
+> 仓库提交的默认值是 `useCloud: true`（面向线上）。本地验证时临时改成 `false`，**这是个人本地改动，不要提交**——和 `project.config.json` 的 appid 一样，提交会让别人的环境跑不起来。
 
 > **注意**：`services/mock.js` 与 `services/cloud.js` 是两套**独立实现**，不是同一份代码的包装。`npm test` 里的静态检查会强制两者导出同名方法，但业务行为仍需人工保持一致。改业务规则时两边都要改。
 
@@ -31,7 +33,7 @@
 ### 方式 A：本地模拟模式（推荐先跑这个，无需部署）
 
 1. 微信开发者工具「导入项目」→ 选择**仓库根目录**（不是 `miniprogram/`），AppID 可选测试号。
-2. 打开 `miniprogram/config/env.js`，把 `useCloud` 改成 `false`。
+2. 打开 `miniprogram/config/env.js`，把 `useCloud` 改成 `false`（本地改动，别提交）。
 3. 工具菜单「工具 → 清缓存 → 清除数据缓存」。
 4. 点「编译」→ 底部「我的」→ 登录。**第一个登录的用户自动成为管理员**，底部出现「管理」tab。
 
