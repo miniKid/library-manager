@@ -29,7 +29,9 @@ Page({
       canNext: false,
       weeks: []
     },
-    WEEKDAYS
+    WEEKDAYS,
+    reviewSummary: { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] },
+    reviewPreview: []
   },
 
   onLoad(options) {
@@ -38,6 +40,27 @@ Page({
     this.loadSettings();
     this.loadBook();
     this.loadSchedules();
+    this.loadReviews();
+  },
+
+  /** 书评概览 + 前 3 条（完整列表在 book-reviews 页） */
+  async loadReviews() {
+    if (!this.id) return;
+    try {
+      const res = await services.getReviews({ bookId: this.id, page: 1, pageSize: 3 });
+      const list = (res.list || []).map((r) => Object.assign({}, r, { initial: String(r.userName || '读').charAt(0) }));
+      this.setData({
+        reviewSummary: res.summary || { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] },
+        reviewPreview: list
+      });
+    } catch (e) {
+      // 评论加载失败不影响详情页主流程
+    }
+  },
+
+  goReviews() {
+    const title = encodeURIComponent((this.data.book && this.data.book.title) || '');
+    wx.navigateTo({ url: `/pages/book-reviews/index?bookId=${this.id}&title=${title}` });
   },
 
   onShow() {

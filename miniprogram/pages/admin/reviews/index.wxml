@@ -1,0 +1,56 @@
+<view class="container">
+  <view class="filters">
+    <view
+      wx:for="{{filters}}"
+      wx:key="key"
+      class="chip {{status === item.key ? 'chip-on' : ''}}"
+      data-status="{{item.key}}"
+      bindtap="onFilter"
+    >{{item.label}}</view>
+  </view>
+
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索评论内容" value="{{keyword}}" bindinput="onKeyword" bindconfirm="onSearch" />
+    <text class="search-btn" bindtap="onSearch">搜索</text>
+  </view>
+
+  <view wx:if="{{!list.length && !loading}}" class="empty">
+    <view class="empty-icon">📝</view>
+    <view>没有符合条件的评论</view>
+  </view>
+
+  <view wx:for="{{list}}" wx:key="_id" class="card review">
+    <view class="head">
+      <text class="name">{{item.userName}}</text>
+      <text class="stars">
+        <block wx:for="{{stars}}" wx:key="*this" wx:for-item="s">
+          <text class="{{item.rating >= s ? 'star-on' : ''}}">★</text>
+        </block>
+      </text>
+      <text class="tag {{item.status === 'hidden' ? 'tag-gray' : 'tag-green'}}">{{item.status === 'hidden' ? '已隐藏' : '展示中'}}</text>
+    </view>
+    <view class="book">《{{item.bookTitle}}》</view>
+    <view class="content">{{item.content}}</view>
+    <view wx:if="{{item.reply}}" class="reply">馆员回复：{{item.reply.content}}</view>
+    <view class="foot">
+      <text class="time">{{item.createdAtText}}</text>
+      <view class="acts">
+        <text class="act" data-id="{{item._id}}" data-content="{{item.reply ? item.reply.content : ''}}" bindtap="openReply">回复</text>
+        <text class="act" data-id="{{item._id}}" data-status="{{item.status}}" bindtap="onToggleStatus">{{item.status === 'hidden' ? '恢复' : '隐藏'}}</text>
+        <text class="act act-danger" data-id="{{item._id}}" bindtap="onDelete">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{list.length < total}}" class="more">上拉加载更多（{{list.length}}/{{total}}）</view>
+</view>
+
+<view class="mask" wx:if="{{replySheet.show}}" bindtap="closeReply"></view>
+<view class="sheet" wx:if="{{replySheet.show}}" catchtap="stopBubble">
+  <view class="sheet-title">馆员回复</view>
+  <textarea class="textarea" maxlength="200" placeholder="最多 200 字，回复后会通知作者" value="{{replySheet.content}}" bindinput="onReplyInput" />
+  <view class="sheet-actions">
+    <button class="btn-plain" bindtap="closeReply">取消</button>
+    <button class="btn-primary" loading="{{replySheet.saving}}" bindtap="onSaveReply">发送</button>
+  </view>
+</view>

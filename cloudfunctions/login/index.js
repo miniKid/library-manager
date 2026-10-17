@@ -28,11 +28,12 @@ exports.main = async (event) => {
   if (!user) {
     // 读取全局设置：指定管理员 openid（settings.global.adminOpenid），空表示由首个登录用户兜底
     let firstLoc = '';
-    let adminOpenid = '';
+    let adminOpenid = process.env.ADMIN_OPENID || '';
     try {
       const sRes = await db.collection('settings').limit(1).get();
       const s = sRes.data && sRes.data[0];
       if (s && Array.isArray(s.locations)) firstLoc = s.locations[0] || '';
+      // 集合里的配置优先于环境变量（便于运营期在管理端直接换人）
       if (s && s.adminOpenid) adminOpenid = s.adminOpenid;
     } catch (e) {
       // settings 集合尚未初始化（尚未运行 initDB），暂无可归属馆藏
@@ -76,11 +77,12 @@ exports.main = async (event) => {
     await users.doc(user._id).update({ data: { card: user.card } });
   }
 
-  // 若设置中指定了管理员 openid 且命中当前用户，确保其拥有管理员权限（支持为已注册用户指定管理员）
+  // 若指定了管理员 openid 且命中当前用户，确保其拥有管理员权限（支持为已注册用户指定管理员）
   try {
     const sRes = await db.collection('settings').limit(1).get();
     const s = sRes.data && sRes.data[0];
-    if (s && s.adminOpenid && s.adminOpenid === OPENID && user.role !== 'admin') {
+    const adminOpenid = (s && s.adminOpenid) || process.env.ADMIN_OPENID || '';
+    if (adminOpenid && adminOpenid === OPENID && user.role !== 'admin') {
       await users.doc(user._id).update({ data: { role: 'admin' } });
       user.role = 'admin';
     }

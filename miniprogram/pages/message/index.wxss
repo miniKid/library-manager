@@ -1,0 +1,146 @@
+.tabs {
+  display: flex;
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 8rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  font-size: 30rpx;
+  color: var(--c-text-2);
+  border-radius: var(--r-sm);
+  position: relative;
+}
+.tab-on {
+  background: var(--c-primary);
+  color: #fff;
+  font-weight: 500;
+}
+.badge {
+  margin-left: 8rpx;
+  background: #C0392B;
+  color: #fff;
+  font-size: 20rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+}
+.tab-on .badge { background: var(--c-accent); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.toolbar-right { display: flex; align-items: center; }
+.toolbar-tip { color: var(--c-text-3); font-size: 24rpx; }
+.link { color: var(--c-primary-2); font-size: 26rpx; margin-left: 24rpx; }
+.chip {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--c-text-2);
+  font-size: 24rpx;
+  border: 1rpx solid var(--c-line);
+}
+.chip-on {
+  background: rgba(43, 91, 132, 0.1);
+  color: var(--c-primary-2);
+  border-color: var(--c-primary-2);
+}
+
+.notice { position: relative; }
+.notice-unread { border-left: 6rpx solid var(--c-primary-2); }
+.notice-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10rpx; }
+.notice-time { color: var(--c-text-3); font-size: 22rpx; }
+.notice-title { font-size: 30rpx; font-weight: 500; margin-bottom: 6rpx; }
+.notice-body { color: var(--c-text-2); font-size: 26rpx; line-height: 1.5; }
+.dot {
+  position: absolute;
+  right: 20rpx;
+  bottom: 20rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: var(--c-danger);
+}
+.more { text-align: center; color: var(--c-text-3); font-size: 26rpx; padding: 24rpx 0; }
+.more-end { color: #C0C4CC; }
+
+.section-title {
+  font-size: 26rpx;
+  color: var(--c-text-3);
+  margin: 8rpx 4rpx 14rpx;
+}
+.section-count { margin-left: 8rpx; color: var(--c-primary-2); }
+
+.todo { display: flex; align-items: flex-start; }
+.todo-sys { background: rgba(43, 91, 132, 0.04); }
+.todo-main { flex: 1; min-width: 0; }
+.todo-title { font-size: 29rpx; font-weight: 500; line-height: 1.5; }
+.todo-desc { font-size: 24rpx; color: var(--c-text-2); margin-top: 6rpx; }
+.todo-date { font-size: 22rpx; color: var(--c-text-3); margin-top: 8rpx; }
+.todo-date-danger { color: var(--c-danger); }
+.todo-overdue { border-left: 6rpx solid var(--c-danger); }
+.todo-done { opacity: 0.6; }
+.todo-done .todo-title { text-decoration: line-through; }
+.todo-arrow { color: #C0C4CC; margin-left: 12rpx; }
+.todo-del {
+  color: #C0C4CC;
+  font-size: 40rpx;
+  line-height: 1;
+  padding: 0 8rpx 0 20rpx;
+}
+
+.check {
+  width: 40rpx;
+  height: 40rpx;
+  border: 2rpx solid #C9CDD4;
+  border-radius: 50%;
+  margin-right: 20rpx;
+  margin-top: 4rpx;
+  flex: none;
+  box-sizing: border-box;
+}
+.check-on {
+  background: var(--c-success);
+  border-color: var(--c-success);
+  color: #fff;
+  font-size: 24rpx;
+  text-align: center;
+  line-height: 36rpx;
+}
+
+.empty-sm { padding: 60rpx 0; }
+.login-btn { margin-top: 30rpx; width: 300rpx; }
+
+.sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+.sheet-title { font-size: 32rpx; font-weight: 600; margin-bottom: 20rpx; }
+.sheet-tip { font-size: 24rpx; color: var(--c-text-3); line-height: 1.5; margin-bottom: 16rpx; }
+.field { border-bottom: 1rpx solid #F0F1F3; padding: 20rpx 0; }
+.field-row { display: flex; align-items: center; justify-content: space-between; }
+.field-label { color: var(--c-text-2); font-size: 28rpx; }
+.field-input { font-size: 28rpx; }
+.prios { display: flex; }
+.prios .chip { margin-left: 16rpx; }
+.pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #F0F1F3;
+  font-size: 28rpx;
+}
+.sheet-actions { display: flex; gap: 20rpx; margin-top: 30rpx; }
+.sheet-actions button { flex: 1; }

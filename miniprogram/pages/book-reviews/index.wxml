@@ -1,0 +1,100 @@
+<view class="container">
+  <!-- 评分概览 -->
+  <view class="card summary">
+    <view class="summary-left">
+      <view class="avg">{{summary.avg || '—'}}</view>
+      <view class="avg-label">平均评分</view>
+      <view class="stars">
+        <block wx:for="{{stars}}" wx:key="*this">
+          <text class="star {{summary.avg >= item - 0.5 ? 'star-on' : ''}}">★</text>
+        </block>
+      </view>
+      <view class="count">{{summary.count}} 条书评</view>
+    </view>
+    <view class="summary-right">
+      <view wx:for="{{distRows}}" wx:key="star" class="dist-row">
+        <text class="dist-label">{{item.star}}星</text>
+        <view class="dist-bar"><view class="dist-fill" style="width: {{item.percent}}%"></view></view>
+        <text class="dist-num">{{item.count}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="toolbar">
+    <view class="sorts">
+      <view class="sort {{sort === 'latest' ? 'sort-on' : ''}}" data-sort="latest" bindtap="onSort">最新</view>
+      <view class="sort {{sort === 'helpful' ? 'sort-on' : ''}}" data-sort="helpful" bindtap="onSort">最有用</view>
+    </view>
+    <view class="write" bindtap="openSheet">{{myReview ? '修改我的书评' : '写书评'}}</view>
+  </view>
+
+  <view wx:if="{{!list.length}}" class="empty">
+    <view class="empty-icon">✍️</view>
+    <view>还没有人写过书评，来做第一个</view>
+  </view>
+
+  <view wx:for="{{list}}" wx:key="_id" class="card review">
+    <view class="review-head">
+      <image wx:if="{{item.avatar}}" class="avatar" src="{{item.avatar}}" mode="aspectFill" />
+      <view wx:else class="avatar avatar-ph">{{item.initial}}</view>
+      <view class="review-meta">
+        <view class="review-name">
+          {{item.userName}}
+          <text wx:if="{{item.mine}}" class="tag tag-blue">我</text>
+        </view>
+        <view class="review-star">
+          <block wx:for="{{stars}}" wx:key="*this" wx:for-item="s">
+            <text class="star-sm {{item.rating >= s ? 'star-on' : ''}}">★</text>
+          </block>
+          <text class="review-time">{{item.createdAtText}}</text>
+        </view>
+      </view>
+      <text wx:if="{{item.mine}}" class="del" bindtap="onDeleteMine">删除</text>
+    </view>
+
+    <view class="review-content">{{item.content}}</view>
+    <view wx:if="{{item.edited}}" class="review-edited">已编辑</view>
+
+    <view wx:if="{{item.reply}}" class="reply">
+      <text class="reply-tag">馆员回复</text>
+      <text class="reply-text">{{item.reply.content}}</text>
+    </view>
+
+    <view class="review-foot">
+      <view class="like {{item.liked ? 'like-on' : ''}}" data-id="{{item._id}}" bindtap="onLike">
+        <text class="like-icon">👍</text>
+        <text>{{item.likeCount || '有用'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</view>
+  <view wx:if="{{list.length && !hasMore}}" class="more more-end">没有更多了</view>
+</view>
+
+<!-- 写书评 -->
+<view class="mask" wx:if="{{sheet.show}}" bindtap="closeSheet"></view>
+<view class="sheet" wx:if="{{sheet.show}}" catchtap="stopBubble">
+  <view class="sheet-title">{{myReview ? '修改书评' : '写书评'}}</view>
+  <view class="rating-row">
+    <block wx:for="{{stars}}" wx:key="*this">
+      <text class="star-lg {{sheet.rating >= item ? 'star-on' : ''}}" data-star="{{item}}" bindtap="onPickStar">★</text>
+    </block>
+    <text class="rating-tip">{{sheet.rating ? sheet.rating + ' 星' : '点击评分'}}</text>
+  </view>
+  <textarea
+    class="textarea"
+    placeholder="说说这本书给你的感受，至少 5 个字（最多 500 字）"
+    maxlength="500"
+    value="{{sheet.content}}"
+    bindinput="onContentInput"
+  />
+  <view class="anon-row">
+    <text>匿名发表</text>
+    <switch checked="{{sheet.anonymous}}" color="#2B5B84" bindchange="onAnonymous" />
+  </view>
+  <view class="sheet-actions">
+    <button class="btn-plain" bindtap="closeSheet">取消</button>
+    <button class="btn-primary" loading="{{sheet.saving}}" bindtap="onSubmit">发布</button>
+  </view>
+</view>

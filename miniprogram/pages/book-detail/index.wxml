@@ -56,6 +56,44 @@
     <view class="desc">{{book.description || '暂无简介'}}</view>
   </view>
 
+  <!-- 读者书评 -->
+  <view class="card">
+    <view class="section-title flex-between">
+      <text>读者书评</text>
+      <text class="review-more" bindtap="goReviews">
+        {{reviewSummary.count ? '全部 ' + reviewSummary.count + ' 条 · 写书评 ›' : '写第一条 ›'}}
+      </text>
+    </view>
+
+    <view wx:if="{{reviewSummary.count}}" class="score-row">
+      <text class="score-num">{{reviewSummary.avg}}</text>
+      <view class="score-right">
+        <view class="score-stars">
+          <block wx:for="{{[1,2,3,4,5]}}" wx:key="*this">
+            <text class="s-star {{reviewSummary.avg >= item - 0.5 ? 's-on' : ''}}">★</text>
+          </block>
+        </view>
+        <text class="score-count">{{reviewSummary.count}} 人评价</text>
+      </view>
+    </view>
+
+    <view wx:for="{{reviewPreview}}" wx:key="_id" class="rv">
+      <view class="rv-head">
+        <text class="rv-name">{{item.userName}}</text>
+        <view class="rv-stars">
+          <block wx:for="{{[1,2,3,4,5]}}" wx:key="*this" wx:for-item="s">
+            <text class="s-star {{item.rating >= s ? 's-on' : ''}}">★</text>
+          </block>
+        </view>
+        <text class="rv-time">{{item.createdAtText}}</text>
+      </view>
+      <view class="rv-content ellipsis-2">{{item.content}}</view>
+      <view wx:if="{{item.reply}}" class="rv-reply">馆员回复：{{item.reply.content}}</view>
+    </view>
+
+    <view wx:if="{{!reviewSummary.count}}" class="rv-empty">还没有书评，来说说你的感受</view>
+  </view>
+
   <view class="card borrow-note">
     <view class="section-title">借阅说明</view>
     <view class="note-line">1. 在线提交借阅申请，审核通过后线下领取图书</view>

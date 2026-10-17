@@ -1,0 +1,54 @@
+<view class="container">
+  <view class="card">
+    <view class="section-title">发送范围</view>
+    <view class="scope-row">
+      <view class="chip {{scope === 'all' ? 'chip-on' : ''}}" data-scope="all" bindtap="onScope">全部用户</view>
+      <view class="chip {{scope === 'location' ? 'chip-on' : ''}}" data-scope="location" bindtap="onScope">按馆藏地点</view>
+    </view>
+    <view wx:if="{{scope === 'location'}}" class="form-item">
+      <text class="form-label">馆藏地点</text>
+      <picker class="form-value" range="{{locations}}" value="{{locationIndex}}" bindchange="onLocation">
+        <view class="picker-value">{{locations[locationIndex] || '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="tip">单次最多送达 500 人；关闭了「公告」以外类型的用户不受影响，公告类不可关闭。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">通知内容</view>
+    <view class="form-item">
+      <text class="form-label">标题</text>
+      <input class="form-input" maxlength="30" placeholder="最多 30 字" value="{{form.title}}" data-field="title" bindinput="onInput" />
+    </view>
+    <view class="form-item form-item-area">
+      <text class="form-label">正文</text>
+      <textarea class="form-area" maxlength="200" placeholder="最多 200 字" value="{{form.content}}" data-field="content" bindinput="onInput" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">点击跳转</text>
+      <picker class="form-value" range="{{links}}" range-key="label" value="{{linkIndex}}" bindchange="onLink">
+        <view class="picker-value">{{links[linkIndex].label}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <button class="btn-primary send-btn" loading="{{sending}}" bindtap="onSend">发送通知</button>
+
+  <view class="section-title history-title">发送记录<text class="count">（共 {{total}} 条）</text></view>
+  <view wx:if="{{!history.length && !loading}}" class="empty">
+    <view class="empty-icon">📢</view>
+    <view>还没有发送过通知</view>
+  </view>
+  <view wx:for="{{history}}" wx:key="_id" class="card record">
+    <view class="record-head">
+      <text class="record-title">{{item.title}}</text>
+      <text class="record-count">送达 {{item.targetCount}} 人</text>
+    </view>
+    <view class="record-body">{{item.content}}</view>
+    <view class="record-foot">
+      <text>{{item.senderName}}</text>
+      <text>{{item.createdAtText}}</text>
+      <text wx:if="{{item.scope === 'location'}}">· {{item.location}}</text>
+    </view>
+  </view>
+</view>

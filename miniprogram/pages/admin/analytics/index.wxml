@@ -1,0 +1,222 @@
+<view class="container">
+  <view class="tabs">
+    <view class="tab {{tab === 'user' ? 'tab-on' : ''}}" data-tab="user" bindtap="onTab">用户统计</view>
+    <view class="tab {{tab === 'book' ? 'tab-on' : ''}}" data-tab="book" bindtap="onTab">书籍统计</view>
+  </view>
+
+  <view class="ranges">
+    <view
+      wx:for="{{ranges}}"
+      wx:key="days"
+      class="chip {{rangeMode === 'preset' && days === item.days ? 'chip-on' : ''}}"
+      data-days="{{item.days}}"
+      bindtap="onRange"
+    >{{item.label}}</view>
+    <view class="chip {{rangeMode === 'custom' ? 'chip-on' : ''}}" bindtap="onCustomRange">自定义</view>
+  </view>
+
+  <!-- 统计区间：用户/书籍共用同一套时间口径 -->
+  <view class="range-panel">
+    <view class="range-panel-head">
+      <text class="range-panel-title">统计区间</text>
+      <text class="range-panel-now">{{rangeText}}</text>
+    </view>
+    <view wx:if="{{rangeMode === 'custom'}}" class="range-pickers">
+      <picker mode="date" value="{{startDate}}" start="{{minDate}}" end="{{today}}" bindchange="onStartDate">
+        <view class="range-field">
+          <text class="range-field-label">开始</text>
+          <text class="range-field-value">{{startDate}}</text>
+        </view>
+      </picker>
+      <text class="range-sep">至</text>
+      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{today}}" bindchange="onEndDate">
+        <view class="range-field">
+          <text class="range-field-label">结束</text>
+          <text class="range-field-value">{{endDate}}</text>
+        </view>
+      </picker>
+      <text class="range-reset" bindtap="onResetRange">重置</text>
+    </view>
+    <view wx:if="{{rangeMode === 'custom'}}" class="range-tip">
+      最早可选 {{minDate}}（两年前），最晚只能到 {{today}}；超过 31 天趋势图自动按周汇总，超过 120 天按月汇总
+    </view>
+  </view>
+
+  <view wx:if="{{error}}" class="empty">
+    <view class="empty-icon">⚠️</view>
+    <view>{{error}}</view>
+  </view>
+  <view wx:if="{{loading}}" class="loading">统计中…</view>
+
+  <!-- ================= 用户 ================= -->
+  <block wx:if="{{!loading && tab === 'user' && user}}">
+    <view class="cards">
+      <view class="stat-card">
+        <view class="stat-num">{{user.cards.total}}</view>
+        <view class="stat-label">注册用户</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{user.cards.activeCards}}</view>
+        <view class="stat-label">有效借书证</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{user.cards.newUsers}}</view>
+        <view class="stat-label">{{userNewLabel}}</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{user.cards.perCapita}}</view>
+        <view class="stat-label">人均借阅</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">结构概览</view>
+      <view class="kv">
+        <text>管理员 {{user.cards.admins}} 人</text>
+        <text>待审批 {{user.cards.pendingCards}} 人</text>
+        <text>期间借阅 {{user.cards.borrowTotal}} 次</text>
+        <text>活跃借阅人 {{user.cards.activeBorrowers}} 人</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">按馆藏地点</view>
+      <view wx:for="{{userBars.location}}" wx:key="label" class="bar-row">
+        <text class="bar-label">{{item.label}}</text>
+        <view class="bar-track"><view class="bar-fill" style="width: {{item.percent}}%"></view></view>
+        <text class="bar-num">{{item.value}}</text>
+      </view>
+      <view wx:if="{{!userBars.location.length}}" class="chart-empty">暂无数据</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">借阅次数分布</view>
+      <view wx:for="{{userBars.buckets}}" wx:key="label" class="bar-row">
+        <text class="bar-label">{{item.label}}</text>
+        <view class="bar-track"><view class="bar-fill bar-fill-2" style="width: {{item.percent}}%"></view></view>
+        <text class="bar-num">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">新增用户趋势（{{trendUnitLabel}}）</view>
+      <view wx:if="{{userBars.trend.length}}" class="vchart">
+        <view wx:for="{{userBars.trend}}" wx:key="label" class="vbar-wrap">
+          <view class="vbar" style="height: {{item.percent}}%"></view>
+        </view>
+      </view>
+      <view wx:if="{{userBars.trend.length}}" class="vaxis">
+        <text>{{userBars.trend[0].label}}</text>
+        <text wx:if="{{userBars.trend.length > 1}}">{{userBars.trend[userBars.trend.length - 1].label}}</text>
+      </view>
+      <view wx:if="{{!userBars.trend.length}}" class="chart-empty">该区间没有新增用户</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">借阅排行 TOP 20</view>
+      <view wx:for="{{user.topBorrowers}}" wx:key="openid" class="rank-row">
+        <text class="rank-i {{index < 3 ? 'rank-top' : ''}}">{{index + 1}}</text>
+        <view class="rank-main">
+          <view class="rank-name ellipsis">{{item.nickname}}</view>
+          <view class="rank-sub">{{item.location || '未开卡'}}·{{item.cardStatus === 'active' ? '已开通' : '未开通'}}</view>
+        </view>
+        <text class="rank-num">{{item.count}} 次</text>
+      </view>
+      <view wx:if="{{!user.topBorrowers.length}}" class="chart-empty">该区间暂无借阅</view>
+    </view>
+  </block>
+
+  <!-- ================= 书籍 ================= -->
+  <block wx:if="{{!loading && tab === 'book' && book}}">
+    <view class="cards">
+      <view class="stat-card">
+        <view class="stat-num">{{book.cards.kinds}}</view>
+        <view class="stat-label">书籍种类</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{book.cards.copies}}</view>
+        <view class="stat-label">馆藏总册</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{book.cards.available}}</view>
+        <view class="stat-label">在架可借</view>
+      </view>
+      <view class="stat-card">
+        <view class="stat-num">{{book.cards.newBooks}}</view>
+        <view class="stat-label">{{bookNewLabel}}</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">分类分布</view>
+      <view wx:for="{{bookBars.category}}" wx:key="label" class="bar-row">
+        <text class="bar-label">{{item.label}}</text>
+        <view class="bar-track"><view class="bar-fill" style="width: {{item.percent}}%"></view></view>
+        <text class="bar-num">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">馆藏地点分布</view>
+      <view wx:for="{{bookBars.location}}" wx:key="label" class="bar-row">
+        <text class="bar-label">{{item.label}}</text>
+        <view class="bar-track"><view class="bar-fill bar-fill-2" style="width: {{item.percent}}%"></view></view>
+        <text class="bar-num">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">评分分布</view>
+      <view wx:for="{{bookBars.rating}}" wx:key="label" class="bar-row">
+        <text class="bar-label">{{item.label}}</text>
+        <view class="bar-track"><view class="bar-fill bar-fill-3" style="width: {{item.percent}}%"></view></view>
+        <text class="bar-num">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">新增书籍趋势（{{trendUnitLabel}}）</view>
+      <view wx:if="{{bookBars.trend.length}}" class="vchart">
+        <view wx:for="{{bookBars.trend}}" wx:key="label" class="vbar-wrap">
+          <view class="vbar" style="height: {{item.percent}}%"></view>
+        </view>
+      </view>
+      <view wx:if="{{bookBars.trend.length}}" class="vaxis">
+        <text>{{bookBars.trend[0].label}}</text>
+        <text wx:if="{{bookBars.trend.length > 1}}">{{bookBars.trend[bookBars.trend.length - 1].label}}</text>
+      </view>
+      <view wx:if="{{!bookBars.trend.length}}" class="chart-empty">该区间没有新增书籍</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">借阅热度 TOP 20</view>
+      <view wx:for="{{book.hotBooks}}" wx:key="bookId" class="rank-row">
+        <text class="rank-i {{index < 3 ? 'rank-top' : ''}}">{{index + 1}}</text>
+        <view class="rank-main">
+          <view class="rank-name ellipsis">{{item.title}}</view>
+          <view class="rank-sub">{{item.author || '佚名'}}</view>
+        </view>
+        <text class="rank-num">{{item.count}} 次</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">滞销书（从未被借且上架超 30 天）</view>
+      <view wx:for="{{book.coldBooks}}" wx:key="bookId" class="rank-row">
+        <text class="rank-i">·</text>
+        <view class="rank-main">
+          <view class="rank-name ellipsis">{{item.title}}</view>
+          <view class="rank-sub">上架 {{item.createdAtText}}</view>
+        </view>
+      </view>
+      <view wx:if="{{!book.coldBooks.length}}" class="chart-empty">没有滞销书，馆藏周转良好</view>
+    </view>
+  </block>
+
+  <view class="export-bar">
+    <button class="btn-primary" loading="{{exporting}}" bindtap="onExport">
+      导出{{tab === 'user' ? '用户' : '书籍'}}统计 CSV
+    </button>
+    <view class="export-tip">导出后可转发到「文件传输助手」，在电脑上用 Excel 打开</view>
+  </view>
+</view>

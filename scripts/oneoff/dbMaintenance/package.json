@@ -1,0 +1,9 @@
+{
+  "name": "dbMaintenance",
+  "version": "1.0.0",
+  "description": "一次性运维脚本：清理 borrows.bookCover、迁移 books.cover 到云存储（跑完即删）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

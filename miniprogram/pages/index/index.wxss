@@ -130,3 +130,35 @@
   font-size: 26rpx;
   font-weight: 600;
 }
+
+/* ===== 为你推荐 ===== */
+.rec { padding: 0 0 8rpx; }
+.rec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 24rpx 14rpx;
+}
+.rec-title { font-size: 30rpx; font-weight: 600; color: var(--c-primary); }
+.rec-more { font-size: 24rpx; color: var(--c-text-3); }
+.rec-scroll { white-space: nowrap; padding: 0 12rpx; }
+.rec-item {
+  display: inline-block;
+  width: 190rpx;
+  margin: 0 12rpx;
+  vertical-align: top;
+}
+.rec-cover {
+  width: 190rpx;
+  height: 250rpx;
+  border-radius: 12rpx;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-card);
+}
+.rec-img { width: 100%; height: 100%; }
+.rec-initial { color: #fff; font-size: 60rpx; font-weight: 600; }
+.rec-name { font-size: 25rpx; margin-top: 10rpx; }
+.rec-reason { font-size: 21rpx; color: var(--c-primary-2); margin-top: 4rpx; }

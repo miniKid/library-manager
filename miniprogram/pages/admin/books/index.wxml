@@ -43,7 +43,7 @@
     <view wx:for="{{books}}" wx:key="_id" class="card book-item">
       <view class="book-cover" style="background: {{item.coverBg}}">
         <view wx:if="{{item.cover}}">
-          <image src="{{item.cover}}" mode="aspectFill" class="cover-img" />
+          <image src="{{item.cover}}" mode="aspectFill" class="cover-img" lazy-load />
         </view>
         <text wx:else class="cover-text">{{item.coverChar}}</text>
       </view>

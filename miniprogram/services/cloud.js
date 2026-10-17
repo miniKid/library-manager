@@ -1,10 +1,10 @@
 /**
  * 微信云开发实现
- * 使用云数据库（books / borrows / users）+ 云函数（login / initDB）
+ * 客户端只直连 books 集合（用于书架/详情展示，集合权限「所有用户可读」）；
+ * borrows / users / settings 等含个人信息的集合一律经云函数访问。
  */
 const env = require('../config/env');
-const { BORROW_STATUS } = require('../utils/constants');
-const { formatDate, formatCST, cstDateStr, cstTodayStr } = require('../utils/util');
+const { exportCsv } = require('./export');
 
 function db() {
   return wx.cloud.database();
@@ -322,60 +322,63 @@ async function getMyBorrows() {
   }
 }
 
-async function getBorrows({ status = '' } = {}) {
-  const where = {};
-  if (status) {
-    // 逾期是派生状态：借出中且已超过应还日期，DB 中 status 仍为 borrowing，故按其查询后再过滤
-    where.status = status === BORROW_STATUS.OVERDUE ? BORROW_STATUS.BORROWING : status;
-  }
-  const res = await db()
-    .collection('borrows')
-    .where(where)
-    .orderBy('borrowDate', 'desc')
-    .limit(100)
-    .get();
-  return res.data
-    .filter((r) => {
-      if (status !== BORROW_STATUS.OVERDUE) return true;
-      return r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-    })
-    .map((r) => {
-      const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-      return {
-        ...r,
-        status: overdue ? BORROW_STATUS.OVERDUE : r.status,
-        borrowDateText: formatDate(r.borrowDate),
-        deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
-        dueDateText: formatDate(r.dueDate),
-        returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
-        scheduledPickupDateText: r.scheduledPickupDate ? formatDate(r.scheduledPickupDate) : '',
-        scheduledReturnDateText: r.scheduledReturnDate ? formatDate(r.scheduledReturnDate) : ''
-      };
+/**
+ * 管理端借阅列表。
+ * borrows 集合已设为「仅云函数可读写」，客户端不再直连数据库；
+ * status=overdue 的派生判定与文案拼装都在云函数里完成（口径与「我的借阅」一致）。
+ */
+async function getBorrows({ status = '', limit = 100 } = {}) {
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'adminBorrows', status, limit }
     });
+    const r = res.result || {};
+    if (!r.ok) {
+      console.warn('[cloud] adminBorrows 失败', r.msg);
+      return [];
+    }
+    return Array.isArray(r.data) ? r.data : [];
+  } catch (e) {
+    console.error('[cloud] adminBorrows 异常', e);
+    return [];
+  }
 }
 
-/** 某本书的全部借阅记录（含未归还），供管理员在详情页查看 */
+/** 借阅记录各状态数量（管理端页签徽标）：一次云调用返回 7 个数字，避免前端 7 次查询 */
+async function getBorrowStatusCounts() {
+  const zero = { all: 0, pending: 0, borrowing: 0, return_requested: 0, overdue: 0, returned: 0, cancelled: 0 };
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'borrowCounts' }
+    });
+    const r = res.result || {};
+    if (!r.ok) return zero;
+    return Object.assign(zero, r.data || {});
+  } catch (e) {
+    return zero;
+  }
+}
+
+/** 某本书的全部借阅记录（含未归还），供管理员在详情页查看；同样走云函数（不直连 borrows） */
 async function getBorrowsByBook(bookId) {
   if (!bookId) return [];
-  const res = await db()
-    .collection('borrows')
-    .where({ bookId })
-    .orderBy('borrowDate', 'desc')
-    .limit(100)
-    .get();
-  return res.data.map((r) => {
-    const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-    return {
-      ...r,
-      status: overdue ? BORROW_STATUS.OVERDUE : r.status,
-      borrowDateText: formatDate(r.borrowDate),
-      deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
-      dueDateText: formatDate(r.dueDate),
-      returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
-      scheduledPickupDateText: r.scheduledPickupDate || '',
-      scheduledReturnDateText: r.scheduledReturnDate || ''
-    };
-  });
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'bookBorrows', bookId }
+    });
+    const r = res.result || {};
+    if (!r.ok) {
+      console.warn('[cloud] bookBorrows 失败', r.msg);
+      return [];
+    }
+    return Array.isArray(r.data) ? r.data : [];
+  } catch (e) {
+    console.error('[cloud] bookBorrows 异常', e);
+    return [];
+  }
 }
 
 /** 各馆藏地点该书的未归还占用数（含待确认申请），用于展示锁定后的可借数量 */
@@ -527,8 +530,177 @@ async function lookupBook(isbn) {
   return res.result;
 }
 
+/** 头像上传的实际实现位于 services/index.js（需要 env.useCloud 判断），此处保持双实现导出面一致 */
+function uploadAvatar(localPath) {
+  return localPath;
+}
+
+/* ==================== 第二期：通知 / 待办 / 评论 / 统计 / 推荐 ==================== */
+
+/** 统一调用云函数并解包 result（出错返回 {ok:false,msg}） */
+async function invoke(name, data) {
+  try {
+    const res = await wx.cloud.callFunction({ name, data });
+    return res.result || { ok: false, msg: '无返回结果' };
+  } catch (e) {
+    return handleError(e);
+  }
+}
+
+/* ---------- 通知 ---------- */
+
+async function getNotifications({ page = 1, pageSize = 20, onlyUnread = false } = {}) {
+  const r = await invoke('notifyManager', { action: 'list', page, pageSize, onlyUnread });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+async function getUnreadNotifCount() {
+  const r = await invoke('notifyManager', { action: 'unreadCount' });
+  return (r.ok && r.data && r.data.count) || 0;
+}
+
+function markNotifRead(id) {
+  return invoke('notifyManager', { action: 'markRead', id });
+}
+
+function markAllNotifRead() {
+  return invoke('notifyManager', { action: 'markAllRead' });
+}
+
+async function getNotifyPrefs() {
+  const r = await invoke('notifyManager', { action: 'getPrefs' });
+  return (r.ok && r.data && r.data.prefs) || {};
+}
+
+async function saveNotifyPrefs(prefs) {
+  const r = await invoke('notifyManager', { action: 'savePrefs', prefs });
+  return r.ok ? r : { ok: false, msg: r.msg || '保存失败' };
+}
+
+/* ---------- 待办 ---------- */
+
+async function getTodos() {
+  const r = await invoke('notifyManager', { action: 'listTodos' });
+  if (!r.ok) return { system: [], active: [], done: [], isAdmin: false, msg: r.msg };
+  return r.data || { system: [], active: [], done: [] };
+}
+
+function addTodo(data) {
+  return invoke('notifyManager', Object.assign({ action: 'addTodo' }, data));
+}
+
+function toggleTodo(id, done) {
+  return invoke('notifyManager', { action: 'toggleTodo', id, done });
+}
+
+function removeTodo(id) {
+  return invoke('notifyManager', { action: 'removeTodo', id });
+}
+
+/* ---------- 管理端群发 ---------- */
+
+async function sendNotification(data) {
+  const r = await invoke('notifyManager', Object.assign({ action: 'send' }, data));
+  return r.ok ? r : { ok: false, msg: r.msg || '发送失败' };
+}
+
+async function getSentNotifications({ page = 1, pageSize = 20 } = {}) {
+  const r = await invoke('notifyManager', { action: 'sentList', page, pageSize });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+/* ---------- 书评 ---------- */
+
+async function getReviews({ bookId, page = 1, pageSize = 10, sort = 'latest' } = {}) {
+  const r = await invoke('reviewManager', { action: 'listReviews', bookId, page, pageSize, sort });
+  if (!r.ok) return { list: [], total: 0, summary: { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] }, msg: r.msg };
+  return r.data;
+}
+
+async function getMyReview(bookId) {
+  const r = await invoke('reviewManager', { action: 'myReview', bookId });
+  return (r.ok && r.data) || null;
+}
+
+function submitReview({ bookId, rating, content, anonymous }) {
+  return invoke('reviewManager', { action: 'addReview', bookId, rating, content, anonymous: !!anonymous });
+}
+
+function removeMyReview(bookId) {
+  return invoke('reviewManager', { action: 'removeReview', bookId });
+}
+
+function likeReview(reviewId) {
+  return invoke('reviewManager', { action: 'likeReview', reviewId });
+}
+
+async function adminGetReviews({ status = 'all', keyword = '', page = 1, pageSize = 20 } = {}) {
+  const r = await invoke('reviewManager', { action: 'adminReviews', status, keyword, page, pageSize });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+function adminSetReviewStatus(reviewId, status) {
+  return invoke('reviewManager', { action: 'setReviewStatus', reviewId, status });
+}
+
+function adminReplyReview(reviewId, content) {
+  return invoke('reviewManager', { action: 'replyReview', reviewId, content });
+}
+
+function adminRemoveReview(reviewId) {
+  return invoke('reviewManager', { action: 'removeReview', reviewId });
+}
+
+/* ---------- 统计与导出 ---------- */
+
+/** 统计入参归一：数字 → { days }；对象 → { days, startDate, endDate } */
+function rangePayload(input, fallbackDays) {
+  if (typeof input === 'number') return { days: input };
+  const opt = input || {};
+  return {
+    days: typeof opt.days === 'number' ? opt.days : fallbackDays,
+    startDate: opt.startDate,
+    endDate: opt.endDate
+  };
+}
+
+/** 用户统计：传数字按「近 N 天」，传 { startDate, endDate } 按自定义区间（含首含尾） */
+async function getUserStats(input = 30) {
+  const r = await invoke('insightManager', Object.assign({ action: 'userStats' }, rangePayload(input, 30)));
+  return r.ok ? r.data : { error: r.msg || '统计失败' };
+}
+
+/** 书籍统计：传数字按「近 N 天」，传 { startDate, endDate } 按自定义区间（含首含尾） */
+async function getBookStats(input = 30) {
+  const r = await invoke('insightManager', Object.assign({ action: 'bookStats' }, rangePayload(input, 30)));
+  return r.ok ? r.data : { error: r.msg || '统计失败' };
+}
+
+/** 用户统计 CSV：区间口径与 getUserStats 一致 */
+async function exportUsersCsv(input = 30) {
+  const r = await invoke('insightManager', Object.assign({ action: 'exportUsers' }, rangePayload(input, 30)));
+  return r.ok ? r.data : { error: r.msg || '导出失败' };
+}
+
+async function exportBooksCsv(days = 30) {
+  const r = await invoke('insightManager', { action: 'exportBooks', days });
+  return r.ok ? r.data : { error: r.msg || '导出失败' };
+}
+
+/* ---------- 推荐 ---------- */
+
+async function getRecommendations({ limit = 6, offset = 0 } = {}) {
+  const r = await invoke('insightManager', { action: 'recommend', limit, offset });
+  if (!r.ok) return { list: [], total: 0, hasMore: false, msg: r.msg };
+  return r.data || { list: [], total: 0, hasMore: false };
+}
+
 module.exports = {
   init,
+  uploadAvatar,
   login,
   updateProfile,
   updateCardLocation,
@@ -549,6 +721,7 @@ module.exports = {
   returnBook,
   getMyBorrows,
   getBorrows,
+  getBorrowStatusCounts,
   getBorrowsByBook,
   getBookOccupied,
   getUsers,
@@ -564,5 +737,33 @@ module.exports = {
   getSettings,
   saveSettings,
   getSchedules,
-  saveSchedule
+  saveSchedule,
+  // 第二期
+  getNotifications,
+  getUnreadNotifCount,
+  markNotifRead,
+  markAllNotifRead,
+  getNotifyPrefs,
+  saveNotifyPrefs,
+  getTodos,
+  addTodo,
+  toggleTodo,
+  removeTodo,
+  sendNotification,
+  getSentNotifications,
+  getReviews,
+  getMyReview,
+  submitReview,
+  removeMyReview,
+  likeReview,
+  adminGetReviews,
+  adminSetReviewStatus,
+  adminReplyReview,
+  adminRemoveReview,
+  getUserStats,
+  getBookStats,
+  exportUsersCsv,
+  exportBooksCsv,
+  exportCsv,
+  getRecommendations
 };

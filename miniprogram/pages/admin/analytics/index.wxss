@@ -1,0 +1,98 @@
+.tabs {
+  display: flex;
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 8rpx;
+  margin-bottom: 16rpx;
+  box-shadow: var(--shadow-card);
+}
+.tab { flex: 1; text-align: center; padding: 18rpx 0; font-size: 30rpx; color: var(--c-text-2); border-radius: var(--r-sm); }
+.tab-on { background: var(--c-primary); color: #fff; font-weight: 500; }
+
+.ranges { display: flex; margin-bottom: 20rpx; }
+.chip {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--c-text-2);
+  font-size: 24rpx;
+  border: 1rpx solid var(--c-line);
+  margin-right: 16rpx;
+}
+.chip-on { background: rgba(43, 91, 132, 0.1); color: var(--c-primary-2); border-color: var(--c-primary-2); }
+
+.cards { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.stat-card {
+  width: 48.5%;
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 28rpx 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+  box-sizing: border-box;
+}
+.stat-num { font-size: 48rpx; font-weight: 600; color: var(--c-primary); line-height: 1.1; }
+.stat-label { font-size: 24rpx; color: var(--c-text-3); margin-top: 8rpx; }
+
+.section-title { font-size: 28rpx; font-weight: 600; margin-bottom: 20rpx; }
+.kv { display: flex; flex-wrap: wrap; }
+.kv text {
+  width: 50%;
+  font-size: 26rpx;
+  color: var(--c-text-2);
+  line-height: 2;
+}
+
+.bar-row { display: flex; align-items: center; margin-bottom: 16rpx; }
+.bar-label { width: 130rpx; font-size: 24rpx; color: var(--c-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 20rpx; background: #F2F3F5; border-radius: 999rpx; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--c-primary-2); border-radius: 999rpx; min-width: 4rpx; }
+.bar-fill-2 { background: var(--c-accent); }
+.bar-fill-3 { background: #7A9CC6; }
+.bar-num { width: 70rpx; text-align: right; font-size: 22rpx; color: var(--c-text-3); }
+.chart-empty { text-align: center; font-size: 24rpx; color: var(--c-text-3); padding: 30rpx 0; }
+
+.vchart { display: flex; align-items: flex-end; height: 160rpx; overflow: hidden; }
+.vbar-wrap { flex: 1; display: flex; align-items: flex-end; justify-content: center; height: 100%; padding: 0 1rpx; }
+.vbar { width: 60%; background: var(--c-primary-2); border-radius: 4rpx 4rpx 0 0; min-height: 4rpx; }
+.vaxis { display: flex; justify-content: space-between; font-size: 20rpx; color: var(--c-text-3); margin-top: 8rpx; }
+
+.rank-row { display: flex; align-items: center; padding: 14rpx 0; border-bottom: 1rpx solid #F5F6F8; }
+.rank-row:last-child { border-bottom: none; }
+.rank-i { width: 44rpx; font-size: 24rpx; color: var(--c-text-3); }
+.rank-top { color: var(--c-accent); font-weight: 600; }
+.rank-main { flex: 1; min-width: 0; }
+.rank-name { font-size: 26rpx; }
+.rank-sub { font-size: 22rpx; color: var(--c-text-3); margin-top: 4rpx; }
+.rank-num { font-size: 24rpx; color: var(--c-primary-2); }
+
+.loading { text-align: center; color: var(--c-text-3); font-size: 26rpx; padding: 60rpx 0; }
+.export-bar { padding: 10rpx 0 40rpx; }
+.export-tip { text-align: center; font-size: 22rpx; color: var(--c-text-3); margin-top: 14rpx; line-height: 1.5; }
+
+/* ===== 统计区间（自定义起止日期） ===== */
+.ranges { flex-wrap: wrap; }
+.range-panel {
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+.range-panel-head { display: flex; align-items: center; justify-content: space-between; }
+.range-panel-title { font-size: 24rpx; color: var(--c-text-3); }
+.range-panel-now { font-size: 24rpx; color: var(--c-primary-2); font-weight: 500; }
+.range-pickers { display: flex; align-items: center; margin-top: 16rpx; }
+.range-field {
+  display: flex;
+  align-items: center;
+  background: #F7F8FA;
+  border-radius: var(--r-sm);
+  padding: 12rpx 16rpx;
+}
+.range-field-label { font-size: 22rpx; color: var(--c-text-3); margin-right: 8rpx; }
+.range-field-value { font-size: 26rpx; color: var(--c-text); }
+.range-sep { font-size: 24rpx; color: var(--c-text-3); margin: 0 12rpx; }
+.range-reset { font-size: 22rpx; color: var(--c-primary-2); margin-left: auto; padding: 8rpx 4rpx; }
+.range-tip { font-size: 21rpx; color: var(--c-text-3); line-height: 1.6; margin-top: 12rpx; }
+.range-pickers picker { flex: 0 0 auto; }

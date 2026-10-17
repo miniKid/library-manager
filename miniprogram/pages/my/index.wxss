@@ -411,3 +411,29 @@
   padding: 16rpx 32rpx 0;
   line-height: 1.6;
 }
+
+/* 快捷入口（第二期：消息 / 待办 / 推荐） */
+.quick { padding: 0; overflow: hidden; }
+.quick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 26rpx 24rpx;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.quick-item:last-child { border-bottom: none; }
+.quick-label { font-size: 29rpx; color: var(--c-text); }
+.quick-right { display: flex; align-items: center; }
+.quick-badge {
+  min-width: 34rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  padding: 0 8rpx;
+  text-align: center;
+  background: var(--c-danger);
+  color: #fff;
+  font-size: 20rpx;
+  border-radius: 999rpx;
+  margin-right: 10rpx;
+  box-sizing: border-box;
+}

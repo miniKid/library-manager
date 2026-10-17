@@ -33,6 +33,7 @@ Page({
     phone: '',
     borrows: [],
     unfinishedBorrows: [],
+    unreadCount: 0,
     loading: false,
     returnPanel: {
       show: false,
@@ -88,9 +89,32 @@ Page({
     });
     if (userInfo) {
       this.loadBorrows();
+      this.loadUnread();
     } else {
-      this.setData({ borrows: [], unfinishedBorrows: [] });
+      this.setData({ borrows: [], unfinishedBorrows: [], unreadCount: 0 });
     }
+  },
+
+  /** 未读通知数（消息入口红点） */
+  async loadUnread() {
+    try {
+      const count = await services.getUnreadNotifCount();
+      this.setData({ unreadCount: count });
+    } catch (e) {
+      this.setData({ unreadCount: 0 });
+    }
+  },
+
+  goMessage() {
+    wx.navigateTo({ url: '/pages/message/index?tab=notice' });
+  },
+
+  goTodos() {
+    wx.navigateTo({ url: '/pages/message/index?tab=todo' });
+  },
+
+  goRecommend() {
+    wx.navigateTo({ url: '/pages/recommend/index' });
   },
 
   /** 借书证状态展示：管理员身份只是叠加的管理权限，不豁免借阅规则，借书证按其真实状态展示 */

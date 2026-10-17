@@ -44,6 +44,19 @@ Page({
     wx.navigateTo({ url: '/pages/admin/schedule/index' });
   },
 
+  // 第二期：统计导出 / 群发通知 / 书评管理
+  goAnalytics() {
+    wx.navigateTo({ url: '/pages/admin/analytics/index' });
+  },
+
+  goNotify() {
+    wx.navigateTo({ url: '/pages/admin/notify/index' });
+  },
+
+  goReviews() {
+    wx.navigateTo({ url: '/pages/admin/reviews/index' });
+  },
+
   goLogin() {
     wx.navigateTo({ url: '/pages/login/index' });
   }
