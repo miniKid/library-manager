@@ -1,19 +1,32 @@
 <view class="page safe-bottom">
-  <!-- 状态筛选 -->
-  <view class="filter-bar">
-    <view
-      wx:for="{{filters}}"
-      wx:key="key"
-      class="filter-item {{activeFilter === item.key ? 'filter-active' : ''}}"
-      data-key="{{item.key}}"
-      bindtap="onFilter"
-    >{{item.label}}</view>
+  <!-- 状态筛选：单行横滑胶囊，文案压到 2-3 字，右侧渐隐提示可滑 -->
+  <view class="filter-wrap">
+    <scroll-view
+      class="filter-scroll"
+      scroll-x
+      scroll-into-view="{{scrollInto}}"
+      scroll-with-animation
+    >
+      <view class="filter-bar">
+        <view
+          wx:for="{{filters}}"
+          wx:key="key"
+          id="chip-{{item.key || 'all'}}"
+          class="chip {{activeFilter === item.key ? 'chip-on' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onFilter"
+        >
+          <text class="chip-label">{{item.label}}</text>
+          <text wx:if="{{item.count > 0}}" class="chip-num {{item.danger ? 'chip-num-danger' : ''}}">{{item.count}}</text>
+        </view>
+      </view>
+    </scroll-view>
   </view>
 
   <view wx:if="{{borrows.length === 0 && !loading}}" class="card">
     <view class="empty">
       <view class="empty-icon">🕐</view>
-      <view>暂无相关借阅记录</view>
+      <view>{{emptyText}}</view>
     </view>
   </view>
 

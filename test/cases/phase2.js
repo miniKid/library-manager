@@ -114,6 +114,40 @@ test('待办：新增→出现在未完成→勾选完成→删除', async () =>
   assert.strictEqual(todos.done.filter((t) => t.title === '整理书架').length, 0, '删除后应彻底移除');
 });
 
+/* ------------------------------- 借阅页签计数 ------------------------------- */
+
+test('借阅页签计数：各状态数量与列表条数一致，逾期为借出中的子集', async () => {
+  resetDb();
+  const me = await mock.login({ nickname: '管理员' });
+  const db = rawDb();
+  const book = db.books[0];
+  const DAY = 86400000;
+  const base = { userId: me.openid, bookId: book._id, bookTitle: book.title, borrowDate: Date.now() - 10 * DAY };
+  db.borrows = [
+    Object.assign({ _id: 't1', status: 'pending' }, base),
+    Object.assign({ _id: 't2', status: 'borrowing', dueDate: Date.now() + 5 * DAY }, base),
+    Object.assign({ _id: 't3', status: 'borrowing', dueDate: Date.now() - 2 * DAY }, base),
+    Object.assign({ _id: 't4', status: 'return_requested', dueDate: Date.now() + 3 * DAY }, base),
+    Object.assign({ _id: 't5', status: 'returned', dueDate: Date.now() - 1 * DAY, returnDate: Date.now() }, base),
+    Object.assign({ _id: 't6', status: 'cancelled' }, base)
+  ];
+
+  const c = await mock.getBorrowStatusCounts();
+  assert.strictEqual(c.all, 6, '全部应为 6 条');
+  assert.strictEqual(c.pending, 1);
+  assert.strictEqual(c.borrowing, 2, '借出中为 DB 原始 borrowing 条数（含逾期）');
+  assert.strictEqual(c.overdue, 1, '逾期只算 borrowing 且已过应还日期');
+  assert.strictEqual(c.return_requested, 1);
+  assert.strictEqual(c.returned, 1);
+  assert.strictEqual(c.cancelled, 1);
+
+  const borrowingList = await mock.getBorrows({ status: 'borrowing' });
+  assert.strictEqual(borrowingList.length, c.borrowing, '「借出中」页签数字应等于点进去的列表条数');
+  const overdueList = await mock.getBorrows({ status: 'overdue' });
+  assert.strictEqual(overdueList.length, c.overdue, '「逾期」页签数字应等于点进去的列表条数');
+  assert.ok(overdueList.length <= borrowingList.length, '逾期是借出中的子集，不应多于借出中');
+});
+
 /* ------------------------------- 统计与导出 ------------------------------- */
 
 test('统计：用户/书籍统计返回完整结构，CSV 含 BOM 与表头', async () => {

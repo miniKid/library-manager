@@ -851,6 +851,22 @@ async function getBorrows({ status = '' } = {}) {
     }));
 }
 
+/** 借阅记录各状态数量（管理端页签徽标），与 cloud.getBorrowStatusCounts 同口径 */
+async function getBorrowStatusCounts() {
+  const db = ensureCollections(getDb());
+  const zero = { all: 0, pending: 0, borrowing: 0, return_requested: 0, overdue: 0, returned: 0, cancelled: 0 };
+  if (!isAdminMe(db)) return zero;
+  const list = db.borrows || [];
+  const counts = Object.assign({}, zero, { all: list.length });
+  let overdue = 0;
+  list.forEach((r) => {
+    if (r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr()) overdue++;
+    if (Object.prototype.hasOwnProperty.call(counts, r.status)) counts[r.status] += 1;
+  });
+  counts.overdue = overdue;
+  return counts;
+}
+
 /** 某本书的全部借阅记录（含未归还），供管理员在详情页查看 */
 async function getBorrowsByBook(bookId) {
   if (!bookId) return [];
@@ -1815,6 +1831,7 @@ module.exports = {
   returnBook,
   getMyBorrows,
   getBorrows,
+  getBorrowStatusCounts,
   getBorrowsByBook,
   getBookOccupied,
   getUsers,

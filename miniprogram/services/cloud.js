@@ -355,6 +355,22 @@ async function getBorrows({ status = '' } = {}) {
     });
 }
 
+/** 借阅记录各状态数量（管理端页签徽标）：一次云调用返回 7 个数字，避免前端 7 次查询 */
+async function getBorrowStatusCounts() {
+  const zero = { all: 0, pending: 0, borrowing: 0, return_requested: 0, overdue: 0, returned: 0, cancelled: 0 };
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'borrowCounts' }
+    });
+    const r = res.result || {};
+    if (!r.ok) return zero;
+    return Object.assign(zero, r.data || {});
+  } catch (e) {
+    return zero;
+  }
+}
+
 /** 某本书的全部借阅记录（含未归还），供管理员在详情页查看 */
 async function getBorrowsByBook(bookId) {
   if (!bookId) return [];
@@ -719,6 +735,7 @@ module.exports = {
   returnBook,
   getMyBorrows,
   getBorrows,
+  getBorrowStatusCounts,
   getBorrowsByBook,
   getBookOccupied,
   getUsers,

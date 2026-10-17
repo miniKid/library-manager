@@ -718,6 +718,44 @@ async function doGetStats() {
   };
 }
 
+/** 借阅管理筛选栏计数（管理端）
+ *  与 doGetStats 同口径，但拆到每个状态，供页签徽标使用：
+ *  - borrowing 为 DB 原始借出中总数（含已逾期，逾期是其派生标签）
+ *  - overdue 单独返回，便于页面把「逾期」标红
+ */
+async function doGetBorrowCounts() {
+  const [all, pending, borrowing, returnRequested, returned, cancelled, borrowingList] = await Promise.all([
+    db.collection('borrows').count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.PENDING }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.BORROWING }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.RETURN_REQUESTED }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.RETURNED }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.CANCELLED }).count(),
+    db
+      .collection('borrows')
+      .where({ status: BORROW_STATUS.BORROWING })
+      .field({ dueDate: true })
+      .limit(1000)
+      .get()
+  ]);
+  let overdue = 0;
+  for (const r of borrowingList.data) {
+    if (r.dueDate && cstDateStr(r.dueDate) < cstTodayStr()) overdue++;
+  }
+  return {
+    ok: true,
+    data: {
+      all: all.total,
+      pending: pending.total,
+      borrowing: borrowing.total,
+      return_requested: returnRequested.total,
+      overdue,
+      returned: returned.total,
+      cancelled: cancelled.total
+    }
+  };
+}
+
 /** 查询某 openid 的用户 */
 async function getUserByOpenid(openid) {
   const r = await db.collection('users').where({ openid }).get();
@@ -1005,6 +1043,9 @@ exports.main = async (event) => {
         return await doDeleteBook(event);
       case 'stats':
         return await doGetStats();
+      case 'borrowCounts':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doGetBorrowCounts();
       // ---- 用户 / 借书证管理 ----
       case 'users':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };

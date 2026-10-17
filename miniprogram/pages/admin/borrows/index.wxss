@@ -1,26 +1,63 @@
 .page { padding: 24rpx; }
 
-/* 筛选栏 */
+/* 筛选栏：吸顶 + 单行横滑，不再等分七格 */
+.filter-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: -24rpx -24rpx 20rpx;
+  padding: 16rpx 0 16rpx 24rpx;
+  background: var(--c-bg);
+}
+/* 右缘渐隐，提示右边还有页签 */
+.filter-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 40rpx;
+  background: linear-gradient(to right, rgba(247, 245, 240, 0), var(--c-bg) 75%);
+  pointer-events: none;
+}
+.filter-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
 .filter-bar {
-  display: flex;
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 8rpx;
-  margin-bottom: 24rpx;
+  display: inline-flex;
+  align-items: center;
+  padding-right: 40rpx;
 }
-.filter-item {
-  flex: 1;
-  text-align: center;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 12rpx 26rpx;
+  margin-right: 14rpx;
+  border-radius: var(--r-pill);
+  background: var(--c-surface);
+  border: 1rpx solid var(--c-line);
   font-size: 26rpx;
-  color: #666;
-  padding: 14rpx 0;
-  border-radius: 12rpx;
+  color: var(--c-text-2);
+  line-height: 1.15;
 }
-.filter-active {
-  background: #2B5B84;
+.chip:last-child { margin-right: 0; }
+.chip-on {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
   color: #fff;
-  font-weight: 600;
+  font-weight: 500;
 }
+.chip-label { line-height: 1.15; }
+.chip-num {
+  margin-left: 8rpx;
+  font-size: 22rpx;
+  color: var(--c-text-3);
+  text-align: center;
+}
+.chip-num-danger { color: var(--c-danger); }
+.chip-on .chip-num { color: rgba(255, 255, 255, 0.85); }
 
 .borrow-item { padding: 24rpx; }
 .borrow-head { margin-bottom: 14rpx; }
