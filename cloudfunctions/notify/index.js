@@ -104,16 +104,21 @@ async function sendReturnRemind(record) {
   }
 }
 
-/** 清理过期通知：单次最多删 200 条，避免超时 */
+/** 清理过期通知：分批删除，每批 200 条，避免单次超时或过期通知堆积漏清 */
 async function cleanupOldNotices() {
   const before = new Date(Date.now() - KEEP_DAYS * 86400000);
+  let total = 0;
   try {
-    const r = await db.collection(NOTICE).where({ createdAt: _.lt(before) }).limit(200).get();
-    await Promise.all(r.data.map((n) => db.collection(NOTICE).doc(n._id).remove().catch(() => {})));
-    return r.data.length;
+    for (;;) {
+      const r = await db.collection(NOTICE).where({ createdAt: _.lt(before) }).limit(200).get();
+      if (!r.data.length) break;
+      await Promise.all(r.data.map((n) => db.collection(NOTICE).doc(n._id).remove().catch(() => {})));
+      total += r.data.length;
+    }
+    return total;
   } catch (e) {
     console.error('[notify] 清理通知失败', e);
-    return 0;
+    return total;
   }
 }
 

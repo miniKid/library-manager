@@ -349,7 +349,7 @@ async function doReply(event, openid) {
   const doc = r && r.data;
   if (!doc) return { ok: false, msg: '评论不存在' };
 
-  const reply = { content, openid, createdAt: new Date() };
+  const reply = { content, openid, createdAt: db.serverDate() };
   await db.collection(COLL).doc(doc._id).update({ data: { reply, updatedAt: db.serverDate() } });
 
   // 站内通知作者（失败不影响回复本身）

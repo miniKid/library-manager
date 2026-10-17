@@ -639,6 +639,19 @@ async function doExportBooks(event, openid) {
     .get();
   const books = res.data;
 
+  // 在借占用：与统计页 doBookStats 同口径（pending/borrowing/return_requested 各占 1 本）
+  const occRes = await db
+    .collection('borrows')
+    .where({ status: _.in(['pending', 'borrowing', 'return_requested']) })
+    .field({ bookId: true })
+    .limit(EXPORT_MAX)
+    .get()
+    .catch(() => ({ data: [] }));
+  const occupied = {};
+  occRes.data.forEach((r) => {
+    occupied[r.bookId] = (occupied[r.bookId] || 0) + 1;
+  });
+
   const rows = books.map((b) => [
     b.title || '',
     b.author || '',
@@ -647,7 +660,7 @@ async function doExportBooks(event, openid) {
     b.publisher || '',
     b.year || '',
     sumStocks(b.stocks),
-    Math.max(0, sumStocks(b.stocks) - 0),
+    Math.max(0, sumStocks(b.stocks) - (occupied[b._id] || 0)),
     Number(b.borrowCount) || 0,
     Number(b.ratingAvg) || 0,
     Number(b.ratingCount) || 0,
