@@ -21,13 +21,16 @@ const BORROW_STATUS = {
 const ROLE = { ADMIN: 'admin', USER: 'user' };
 
 // 订阅消息模板 ID（与公众平台「订阅消息」中创建的一致，均为一次性订阅）
+// 允许用云函数环境变量覆盖：换模板时不必改代码、重新部署，控制台改配置即可
 const TMPL = {
-  BORROW_OK: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4',     // 借阅成功通知
-  RETURN_REMIND: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM',  // 图书到期提醒（定时）
-  OVERDUE_REMIND: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo'  // 逾期提醒（管理员手动触发）
+  BORROW_OK: process.env.TMPL_BORROW_OK || 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4', // 借阅成功通知
+  RETURN_REMIND: process.env.TMPL_RETURN_REMIND || 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
+  OVERDUE_REMIND: process.env.TMPL_OVERDUE_REMIND || 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo' // 逾期提醒（管理员手动触发）
 };
-// 跳转版本：开发工具内调试用 'developer'，正式发布后改为 'formal'
-const MP_STATE = 'developer';
+// 订阅消息点击后的跳转版本：默认 'formal'（正式版）；
+// 开发/体验阶段在云函数环境变量里配 MP_STATE=developer / trial，不要写死在代码里，
+// 否则上线后用户点消息会提示「小程序不存在」。
+const MP_STATE = process.env.MP_STATE || 'formal';
 
 /** 汇总各地点馆藏总数 */
 function sumStocks(stocks) {
@@ -370,7 +373,7 @@ async function doBorrow(event, openid) {
     data: {
       bookId,
       bookTitle: book.title,
-      bookCover: book.cover || '',
+      // 不写 bookCover：每条借阅记录复制一份 base64 封面既撑大响应体也没有消费方
       location,
       userId: openid,
       userName: (profile && profile.nickname) || '微信用户',
@@ -662,6 +665,8 @@ async function doMyBorrows(openid) {
     .where({ userId: openid })
     .orderBy('borrowDate', 'desc')
     .limit(100)
+    // 不回传 bookCover：历史记录里存过 base64 封面副本，纯冗余且撑大响应体
+    .field({ bookCover: false })
     .get();
   return res.data.map((r) => {
     const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
@@ -676,6 +681,67 @@ async function doMyBorrows(openid) {
       scheduledReturnDateText: r.scheduledReturnDate || ''
     };
   });
+}
+
+/** 借阅记录的对外形态：派生逾期状态 + 页面直接可用的文案；不回传 bookCover（历史冗余字段） */
+function decorateBorrow(r) {
+  // 注意：逾期是派生值，不落库；BORROW_STATUS 里没有 OVERDUE 键，必须用字面量
+  const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
+  const out = {
+    ...r,
+    status: overdue ? 'overdue' : r.status,
+    borrowDateText: formatDate(r.borrowDate),
+    deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
+    dueDateText: formatCST(r.dueDate),
+    returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
+    scheduledPickupDateText: r.scheduledPickupDate || '',
+    scheduledReturnDateText: r.scheduledReturnDate || ''
+  };
+  delete out.bookCover;
+  return out;
+}
+
+/**
+ * 管理端借阅列表（原客户端直读 borrows，已收回云函数：该集合不再对外开放读权限）
+ * @param {string} status '' | pending | borrowing | return_requested | returned | cancelled | overdue
+ */
+async function doAdminBorrows(event = {}) {
+  const status = String(event.status || '');
+  const where = {};
+  if (status) {
+    // 逾期是派生状态：库里 status 仍是 borrowing，先按 borrowing 查再按应还日期过滤
+    where.status = status === 'overdue' ? BORROW_STATUS.BORROWING : status;
+  }
+  const size = Math.min(Math.max(parseInt(event.limit, 10) || 100, 1), 100);
+  const res = await db
+    .collection('borrows')
+    .where(where)
+    .orderBy('borrowDate', 'desc')
+    .limit(size)
+    .field({ bookCover: false })
+    .get();
+  let list = res.data;
+  if (status === 'overdue') {
+    list = list.filter(
+      (r) => r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr()
+    );
+  }
+  return { ok: true, data: list.map(decorateBorrow) };
+}
+
+/** 某本书的全部借阅记录（管理端图书详情 → 借阅记录页），同样走云函数 */
+async function doBookBorrows(event = {}) {
+  const bookId = String(event.bookId || '');
+  if (!bookId) return { ok: false, msg: '参数错误' };
+  const size = Math.min(Math.max(parseInt(event.limit, 10) || 100, 1), 100);
+  const res = await db
+    .collection('borrows')
+    .where({ bookId })
+    .orderBy('borrowDate', 'desc')
+    .limit(size)
+    .field({ bookCover: false })
+    .get();
+  return { ok: true, data: res.data.map(decorateBorrow) };
 }
 
 /** 统计概览（管理端）
@@ -929,48 +995,6 @@ async function doGetUsers(event = {}) {
   return { ok: true, data: { list: r.data, total: countRes.total } };
 }
 
-// ============ 临时：批量写入 mock 用户（仅供测试用户管理页，测试完毕后请删除本函数及对应 case） ============
-async function doSeedMockUsers(event = {}) {
-  if (event.clear) {
-    for (;;) {
-      const list = await db.collection('users').where({ openid: db.RegExp({ regexp: '^seed_' }) }).limit(100).get();
-      if (!list.data.length) break;
-      await db.collection('users').where({ openid: db.RegExp({ regexp: '^seed_' }) }).remove();
-    }
-    return { ok: true, cleared: true };
-  }
-  const count = Math.min(Math.max(parseInt(event.count, 10) || 30, 1), 300);
-  const settings = await getSettings();
-  const locs = (settings && settings.locations) || ['广州', '西安'];
-  const surnames = '赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜'.split('');
-  const givens = '伟芳娜秀英敏静丽强磊洋勇艳杰娟涛明超霞平刚桂兰建华文辉'.split('');
-  const statusPool = ['active', 'pending', 'none', 'rejected'];
-  const baseTs = Date.now();
-  const docs = [];
-  for (let i = 0; i < count; i++) {
-    const name = surnames[i % surnames.length] + givens[(i * 5) % givens.length] + (i >= 20 ? i : '');
-    const status = statusPool[i % statusPool.length];
-    const ts = new Date(baseTs - (count - i) * 60000);
-    docs.push({
-      openid: 'seed_' + baseTs.toString(36) + '_' + i,
-      nickname: name,
-      role: i < 3 ? ROLE.ADMIN : ROLE.USER,
-      avatarUrl: '',
-      createdAt: ts,
-      card: {
-        status,
-        location: locs[i % locs.length],
-        phone: status === 'none' ? '' : '138' + String(10000000 + (i * 137 % 90000000)).padStart(8, '0'),
-        applyDate: status === 'none' ? null : ts
-      }
-    });
-  }
-  for (let i = 0; i < docs.length; i += 50) {
-    await db.collection('users').add({ data: docs.slice(i, i + 50) });
-  }
-  return { ok: true, inserted: docs.length };
-}
-
 /** 借阅人续借：逾期前自主申请，延长应还日期（按馆藏设置续借次数与天数） */
 async function doRenewBorrow(event, openid) {
   const { borrowId } = event;
@@ -1043,6 +1067,13 @@ exports.main = async (event) => {
         return await doDeleteBook(event);
       case 'stats':
         return await doGetStats();
+      // ---- 借阅查询（管理端）：borrows 集合已关闭客户端读权限，只能经这里查 ----
+      case 'adminBorrows':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doAdminBorrows(event);
+      case 'bookBorrows':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doBookBorrows(event);
       case 'borrowCounts':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
         return await doGetBorrowCounts();
@@ -1073,9 +1104,6 @@ exports.main = async (event) => {
       case 'sendOverdueRemind':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
         return await doSendOverdueRemind(event);
-      // 临时：批量写入/清空 mock 用户（测试用，测试完删除）
-      case 'seedMockUsers':
-        return await doSeedMockUsers(event);
       default:
         return { ok: false, msg: '未知操作' };
     }

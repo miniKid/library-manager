@@ -148,6 +148,37 @@ test('借阅页签计数：各状态数量与列表条数一致，逾期为借�
   assert.ok(overdueList.length <= borrowingList.length, '逾期是借出中的子集，不应多于借出中');
 });
 
+test('借阅记录不再携带 bookCover：存量字段在出口被剔除', async () => {
+  resetDb();
+  const me = await mock.login({ nickname: '管理员' });
+  const db = rawDb();
+  const book = db.books[0];
+  // 模拟存量记录：早期写入过 base64 封面副本
+  db.borrows = [
+    {
+      _id: 'legacy1',
+      bookId: book._id,
+      bookTitle: book.title,
+      bookCover: 'data:image/jpeg;base64,AAAA',
+      userId: me.openid,
+      userName: me.nickname,
+      location: '广州',
+      status: 'returned',
+      borrowDate: Date.now() - 86400000,
+      dueDate: Date.now() - 3600000,
+      returnDate: Date.now() - 1800000
+    }
+  ];
+
+  const has = (o) => Object.prototype.hasOwnProperty.call(o, 'bookCover');
+  const adminList = await mock.getBorrows({});
+  assert.ok(adminList.length === 1 && !has(adminList[0]), '管理端列表应剔除 bookCover');
+  const mine = await mock.getMyBorrows({ nickname: '管理员' });
+  assert.ok(mine.length === 1 && !has(mine[0]), '我的借阅应剔除 bookCover');
+  const byBook = await mock.getBorrowsByBook(book._id);
+  assert.ok(byBook.length === 1 && !has(byBook[0]), '图书借阅记录应剔除 bookCover');
+});
+
 /* ------------------------------- 统计与导出 ------------------------------- */
 
 test('统计：用户/书籍统计返回完整结构，CSV 含 BOM 与表头', async () => {

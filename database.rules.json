@@ -1,0 +1,40 @@
+{
+  "_readme": [
+    "云开发数据库安全规则（版本基准）。控制台「数据库 → 集合 → 权限设置 → 自定义安全规则」逐集合粘贴下方对应对象即可。",
+    "原则：客户端只直连 books（书架/详情展示需要）；其余集合含个人信息或写操作，一律只经云函数访问。",
+    "云函数使用 wx-server-sdk 访问数据库，不受这里的规则限制，因此收紧后原有功能不受影响。",
+    "改权限时请同步修改本文件，避免「换个人部署就是另一套权限」。"
+  ],
+  "books": {
+    "read": true,
+    "write": false
+  },
+  "borrows": {
+    "read": false,
+    "write": false
+  },
+  "users": {
+    "read": false,
+    "write": false
+  },
+  "settings": {
+    "read": false,
+    "write": false
+  },
+  "reviews": {
+    "read": false,
+    "write": false
+  },
+  "notifications": {
+    "read": false,
+    "write": false
+  },
+  "todos": {
+    "read": false,
+    "write": false
+  },
+  "noticeLogs": {
+    "read": false,
+    "write": false
+  }
+}

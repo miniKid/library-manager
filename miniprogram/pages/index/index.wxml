@@ -38,7 +38,7 @@
     <scroll-view class="rec-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="rec-item" wx:for="{{recommends}}" wx:key="_id" data-id="{{item._id}}" bindtap="goDetail">
         <view class="rec-cover" style="background: {{item.coverBg}}">
-          <image wx:if="{{item.cover}}" class="rec-img" src="{{item.cover}}" mode="aspectFill" />
+          <image wx:if="{{item.cover}}" class="rec-img" src="{{item.cover}}" mode="aspectFill" lazy-load />
           <text wx:else class="rec-initial">{{item.initial}}</text>
         </view>
         <view class="rec-name ellipsis">{{item.title}}</view>
@@ -58,7 +58,7 @@
     >
       <view class="book-cover" style="background: {{item.coverBg}}">
         <view wx:if="{{item.cover}}" class="book-cover-img">
-          <image src="{{item.cover}}" mode="aspectFill" />
+          <image src="{{item.cover}}" mode="aspectFill" lazy-load />
         </view>
         <text wx:else class="book-cover-text">{{item.coverChar}}</text>
       </view>

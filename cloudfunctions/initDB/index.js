@@ -69,8 +69,9 @@ exports.main = async () => {
         maxBorrow: 3,
         // 留空 = 首个登录用户自动成为管理员（部署到自己的环境时必须留空，
         // 否则会被锁在管理端之外：login 判定「配了 adminOpenid 就只认这一个人」）。
-        // 需要指定管理员时，用管理端「设置」页或控制台改成你自己的 openid。
-        adminOpenid: ''
+        // 需要指定管理员时，优先在云函数环境变量里配 ADMIN_OPENID（仓库里不出现真实 openid），
+        // 也可以部署后在管理端「设置」页或控制台改 settings.global.adminOpenid。
+        adminOpenid: process.env.ADMIN_OPENID || ''
       }
     });
   }
@@ -79,7 +80,10 @@ exports.main = async () => {
   try {
     const sDoc = await db.collection('settings').doc('global').get();
     if (sDoc.data && sDoc.data.adminOpenid === undefined) {
-      await db.collection('settings').doc('global').update({ data: { adminOpenid: '' } });
+      await db
+        .collection('settings')
+        .doc('global')
+        .update({ data: { adminOpenid: process.env.ADMIN_OPENID || '' } });
     }
   } catch (e) {}
 

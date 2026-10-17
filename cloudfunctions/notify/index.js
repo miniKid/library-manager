@@ -14,8 +14,10 @@ const db = cloud.database();
 const _ = db.command;
 
 const BORROW_STATUS = { BORROWING: 'borrowing' };
-const TMPL_RETURN_REMIND = 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM';
-const MP_STATE = 'developer'; // 上线后改为 'formal'
+const TMPL_RETURN_REMIND =
+  process.env.TMPL_RETURN_REMIND || 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM';
+// 订阅消息跳转版本：默认正式版，开发阶段用云函数环境变量 MP_STATE=developer / trial 覆盖
+const MP_STATE = process.env.MP_STATE || 'formal';
 
 const NOTICE = 'notifications';
 const KEEP_DAYS = 90;

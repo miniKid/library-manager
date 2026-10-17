@@ -12,7 +12,7 @@
     bindtap="onTapBook"
   >
     <view class="cover" style="background: {{item.coverBg}}">
-      <image wx:if="{{item.cover}}" class="cover-img" src="{{item.cover}}" mode="aspectFill" />
+      <image wx:if="{{item.cover}}" class="cover-img" src="{{item.cover}}" mode="aspectFill" lazy-load />
       <text wx:else class="cover-text">{{item.initial}}</text>
     </view>
     <view class="info">

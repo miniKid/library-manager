@@ -1,11 +1,10 @@
 /**
  * 微信云开发实现
- * 使用云数据库（books / borrows / users）+ 云函数（login / initDB）
+ * 客户端只直连 books 集合（用于书架/详情展示，集合权限「所有用户可读」）；
+ * borrows / users / settings 等含个人信息的集合一律经云函数访问。
  */
 const env = require('../config/env');
 const { exportCsv } = require('./export');
-const { BORROW_STATUS } = require('../utils/constants');
-const { formatDate, formatCST, cstDateStr, cstTodayStr } = require('../utils/util');
 
 function db() {
   return wx.cloud.database();
@@ -323,36 +322,27 @@ async function getMyBorrows() {
   }
 }
 
-async function getBorrows({ status = '' } = {}) {
-  const where = {};
-  if (status) {
-    // 逾期是派生状态：借出中且已超过应还日期，DB 中 status 仍为 borrowing，故按其查询后再过滤
-    where.status = status === BORROW_STATUS.OVERDUE ? BORROW_STATUS.BORROWING : status;
-  }
-  const res = await db()
-    .collection('borrows')
-    .where(where)
-    .orderBy('borrowDate', 'desc')
-    .limit(100)
-    .get();
-  return res.data
-    .filter((r) => {
-      if (status !== BORROW_STATUS.OVERDUE) return true;
-      return r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-    })
-    .map((r) => {
-      const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-      return {
-        ...r,
-        status: overdue ? BORROW_STATUS.OVERDUE : r.status,
-        borrowDateText: formatDate(r.borrowDate),
-        deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
-        dueDateText: formatDate(r.dueDate),
-        returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
-        scheduledPickupDateText: r.scheduledPickupDate ? formatDate(r.scheduledPickupDate) : '',
-        scheduledReturnDateText: r.scheduledReturnDate ? formatDate(r.scheduledReturnDate) : ''
-      };
+/**
+ * 管理端借阅列表。
+ * borrows 集合已设为「仅云函数可读写」，客户端不再直连数据库；
+ * status=overdue 的派生判定与文案拼装都在云函数里完成（口径与「我的借阅」一致）。
+ */
+async function getBorrows({ status = '', limit = 100 } = {}) {
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'adminBorrows', status, limit }
     });
+    const r = res.result || {};
+    if (!r.ok) {
+      console.warn('[cloud] adminBorrows 失败', r.msg);
+      return [];
+    }
+    return Array.isArray(r.data) ? r.data : [];
+  } catch (e) {
+    console.error('[cloud] adminBorrows 异常', e);
+    return [];
+  }
 }
 
 /** 借阅记录各状态数量（管理端页签徽标）：一次云调用返回 7 个数字，避免前端 7 次查询 */
@@ -371,28 +361,24 @@ async function getBorrowStatusCounts() {
   }
 }
 
-/** 某本书的全部借阅记录（含未归还），供管理员在详情页查看 */
+/** 某本书的全部借阅记录（含未归还），供管理员在详情页查看；同样走云函数（不直连 borrows） */
 async function getBorrowsByBook(bookId) {
   if (!bookId) return [];
-  const res = await db()
-    .collection('borrows')
-    .where({ bookId })
-    .orderBy('borrowDate', 'desc')
-    .limit(100)
-    .get();
-  return res.data.map((r) => {
-    const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
-    return {
-      ...r,
-      status: overdue ? BORROW_STATUS.OVERDUE : r.status,
-      borrowDateText: formatDate(r.borrowDate),
-      deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
-      dueDateText: formatDate(r.dueDate),
-      returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
-      scheduledPickupDateText: r.scheduledPickupDate || '',
-      scheduledReturnDateText: r.scheduledReturnDate || ''
-    };
-  });
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'borrowManager',
+      data: { action: 'bookBorrows', bookId }
+    });
+    const r = res.result || {};
+    if (!r.ok) {
+      console.warn('[cloud] bookBorrows 失败', r.msg);
+      return [];
+    }
+    return Array.isArray(r.data) ? r.data : [];
+  } catch (e) {
+    console.error('[cloud] bookBorrows 异常', e);
+    return [];
+  }
 }
 
 /** 各馆藏地点该书的未归还占用数（含待确认申请），用于展示锁定后的可借数量 */

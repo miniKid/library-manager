@@ -45,7 +45,8 @@
 2. 把 `project.config.json` 的 `appid` 换成自己的（**只改本地，不要提交**）。
 3. `miniprogram/config/env.js`：`useCloud: true` + `cloudEnv` 填云环境 ID。
 4. 云开发控制台建 4 个集合：`reviews`、`notifications`、`todos`、`noticeLogs`，权限均选「所有用户不可读写」。
-5. 建索引（字段顺序不能乱）：
+5. **按 [`database.rules.json`](database.rules.json) 配置每个集合的权限**（客户端只直连 `books`，其余集合一律只经云函数访问）。逐集合「权限设置 → 自定义安全规则」粘贴对应对象即可。
+6. 建索引（字段顺序不能乱）：
 
    | 集合 | 索引 |
    |---|---|
@@ -54,9 +55,17 @@
    | `todos` | `ownerOpenid`↑ + `done`↑ + `dueDate`↑ |
    | `noticeLogs` | `createdAt`↓ |
 
-6. 左侧文件树右键 `cloudfunctions` → 「当前环境」选中你的环境，然后逐个右键「上传并部署：云端安装依赖」：
+7. 左侧文件树右键 `cloudfunctions` → 「当前环境」选中你的环境，然后逐个右键「上传并部署：云端安装依赖」：
    `login`、`initDB`、`lookupBook`、`borrowManager`、`notify`、`notifyManager`、`reviewManager`、`insightManager`
-7. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次，写入种子图书与全局设置。
+8. （可选）给 `borrowManager` / `notify` 配环境变量，换配置不用改代码、不用重新部署：
+
+   | 变量 | 作用 | 默认 |
+   |---|---|---|
+   | `MP_STATE` | 订阅消息点击后跳转的版本：`formal` 正式 / `trial` 体验 / `developer` 开发 | `formal` |
+   | `ADMIN_OPENID` | 指定初始管理员（也可在管理端「设置」页改 `settings.global.adminOpenid`，集合值优先） | 空 = 首个登录用户当管理员 |
+   | `TMPL_BORROW_OK` / `TMPL_RETURN_REMIND` / `TMPL_OVERDUE_REMIND` | 三个订阅消息模板 ID | 仓库内置的示例模板 |
+
+9. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次，写入种子图书与全局设置。
 
 > 每一步的点按路径、验收清单、常见报错对照，见 **[docs/本地验证指南.md](docs/本地验证指南.md)**。
 
@@ -65,6 +74,7 @@
 ```
 ├── project.config.json          # 项目配置（AppID、目录）
 ├── cloudbaserc.json             # 云开发环境配置
+├── database.rules.json          # 数据库安全规则（客户端可直连哪些集合的唯一依据）
 ├── cloudfunctions/              # 云函数
 │   ├── login/                   # 登录：openid 换取用户，首个用户自动管理员
 │   ├── initDB/                  # 初始化集合、全局设置与种子图书
@@ -76,6 +86,8 @@
 │   ├── lookupBook/              # ISBN / 书名查询图书信息
 │   ├── fixBookCover/            # 一次性脚本：修复历史封面
 │   └── migrateStocks/           # 一次性脚本：库存字段迁移到多馆藏结构
+├── scripts/                     # 一次性运维脚本（不随生产部署，见 scripts/README.md）
+│   └── oneoff/dbMaintenance/    # 清理 borrows.bookCover、封面迁云存储（临时部署后删除）
 └── miniprogram/
     ├── app.js / app.json / app.wxss
     ├── config/env.js            # 双模式开关 + 云环境 ID
@@ -111,27 +123,31 @@
 
 ## 数据库结构
 
-| 集合 | 主要字段 | 读写权限 |
+| 集合 | 主要字段 | 客户端权限 |
 |---|---|---|
-| `books` | title, author, isbn, category, publisher, year, description, cover, stocks（按地点库存）, stock, status, borrowCount, ratingAvg, ratingCount, reviewCount, createdAt | 所有用户可读 |
-| `borrows` | bookId, bookTitle, userId, userName, location, borrowDate, deliverDate, dueDate, returnDate, status(pending/borrowing/return_requested/returned/cancelled/overdue), renewed | 客户端需读自己的记录（见下方「安全须知」） |
-| `users` | openid, nickname, avatarUrl, role(user/admin), card{status,location,phone,...}, notifyPrefs, createdAt | 仅云函数读写 |
-| `settings` | 单文档 `_id: 'global'`：locations, borrowDays, maxBorrow, adminOpenid, schedules（按地点的值班表） | 所有用户可读 |
-| `reviews` | bookId, bookTitle, openid, userName, rating, content, anonymous, likeCount, likedBy[], status(approved/hidden), reply{}, createdAt | 所有用户不可读写 |
-| `notifications` | toOpenid, type, title, content, link, level, bizId, read, readAt, senderName, createdAt | 所有用户不可读写 |
-| `todos` | ownerOpenid, title, note, dueDate, priority, done, createdAt | 所有用户不可读写 |
-| `noticeLogs` | senderOpenid, senderName, title, content, scope, location, targetCount, createdAt | 所有用户不可读写 |
+| `books` | title, author, isbn, category, publisher, year, description, cover, stocks（按地点库存）, stock, status, borrowCount, ratingAvg, ratingCount, reviewCount, createdAt | **可读**、不可写（唯一允许客户端直连的集合） |
+| `borrows` | bookId, bookTitle, userId, userName, location, borrowDate, deliverDate, dueDate, returnDate, status(pending/borrowing/return_requested/returned/cancelled) | 不可读写（`myBorrows` / `adminBorrows` / `bookBorrows` 三个云函数 action 提供数据） |
+| `users` | openid, nickname, avatarUrl, role(user/admin), card{status,location,phone,...}, notifyPrefs, createdAt | 不可读写 |
+| `settings` | 单文档 `_id: 'global'`：locations, borrowDays, maxBorrow, adminOpenid, schedules（按地点的值班表） | 不可读写（经 `getSettings` 云函数读取） |
+| `reviews` | bookId, bookTitle, openid, userName, rating, content, anonymous, likeCount, likedBy[], status(approved/hidden), reply{}, createdAt | 不可读写 |
+| `notifications` | toOpenid, type, title, content, link, level, bizId, read, readAt, senderName, createdAt | 不可读写 |
+| `todos` | ownerOpenid, title, note, dueDate, priority, done, createdAt | 不可读写 |
+| `noticeLogs` | senderOpenid, senderName, title, content, scope, location, targetCount, createdAt | 不可读写 |
 
-> **安全须知**：`borrows` 目前为了支持「我的借阅」在客户端直查，需放开「所有用户可读」，这会让任何用户能读到全馆借阅记录（openid + 昵称 + 书名）。后续应改为全部走云函数查询并收紧权限。新增的 4 个集合已强制「所有用户不可读写」，只经云函数访问。
+> **安全基线**：客户端只直连 `books`，其余集合**一律「所有用户不可读写」**，只能经云函数访问（云函数用 `wx-server-sdk`，不受客户端规则限制）。`borrows` 里有 openid、昵称、书名、馆藏地点，开放读权限等于把全馆借阅流水公开给任何打开控制台的人。
+>
+> 权限的唯一事实来源是 [`database.rules.json`](database.rules.json)，改权限时请同步改它，不要在控制台手点完就完事。
+>
+> 借阅记录**不再存 `bookCover`**：早期每条记录都会复制一份 ≤40KB 的 base64 封面（UI 从未使用），现在写入端已去掉，存量数据用 `scripts/oneoff/dbMaintenance` 清（见 [scripts/README.md](scripts/README.md)）。
 
 ## 云函数一览
 
 | 函数 | 职责 | 触发器 / 权限 |
 |---|---|---|
-| `login` | openid 换取用户；`settings.adminOpenid` 为空时首个用户为管理员 | — |
+| `login` | openid 换取用户；`settings.adminOpenid` / `ADMIN_OPENID` 为空时首个用户为管理员 | — |
 | `initDB` | 建集合、写全局设置与种子图书（幂等） | 手动执行一次 |
-| `borrowManager` | 借阅全流程、逾期提醒、借书证审批、图书增删改 | `subscribeMessage.send` |
-| `notify` | 每天 9:00 扫描到期/逾期，发订阅消息 + 写站内通知，清理 90 天前通知 | timer `0 0 9 * * *`、`subscribeMessage.send` |
+| `borrowManager` | 借阅全流程、逾期提醒、借书证审批、图书增删改、管理端借阅查询（`adminBorrows` / `bookBorrows`） | `subscribeMessage.send`；环境变量 `MP_STATE`、`ADMIN_OPENID`、`TMPL_*` |
+| `notify` | 每天 9:00 扫描到期/逾期，发订阅消息 + 写站内通知，清理 90 天前通知 | timer `0 0 9 * * *`、`subscribeMessage.send`；环境变量 `MP_STATE`、`TMPL_RETURN_REMIND` |
 | `notifyManager` | 通知列表/已读/偏好、待办 CRUD、管理员群发与发送记录 | — |
 | `reviewManager` | 书评列表/提交/编辑/删除、点赞、审核、回复（回复会通知作者） | — |
 | `insightManager` | 用户统计、书籍统计、CSV 导出、推荐打分 | — |
@@ -144,7 +160,7 @@ node test/run-tests.js     # 无需安装依赖
 ```
 
 - 覆盖：业务规则（借阅/续借/还书/借书证）、第二期功能（书评聚合与审核、通知未读、待办 CRUD、统计与 CSV、推荐）、静态检查（页面与云函数约定）。
-- 当前基线：**50 / 56 通过**。剩余 6 条为仓库既有失败（4 条借书证业务用例 + 2 条静态检查误报），改动前后一致，可对照 `/tmp` 原始副本确认。
+- 当前基线：**61 / 67 通过**。剩余 6 条为仓库既有失败（4 条借书证业务用例 + 2 条静态检查误报），改动前后一致，可对照 `/tmp` 原始副本确认。
 
 ## 文档
 
@@ -156,7 +172,10 @@ node test/run-tests.js     # 无需安装依赖
 ## 常见问题
 
 - **本地模式登录后不是管理员？** 首个登录用户自动成为管理员；否则清缓存重新登录，或在 `env.js` 里用 `mockAdminOpenid` 指定。
-- **云模式登录后不是管理员？** 检查 `settings` 集合里 `_id: global` 的 `adminOpenid`，必须是空字符串（填了别人的 openid 就只认那个人）。
+- **云模式登录后不是管理员？** 检查 `settings` 集合里 `_id: global` 的 `adminOpenid`，必须是空字符串（填了别人的 openid 就只认那个人）；或删掉该字段，让 `ADMIN_OPENID` 环境变量 / 首个登录用户生效。
+- **点订阅消息提示「小程序不存在」？** `MP_STATE` 还是 `developer`。代码默认 `formal`，开发阶段在云函数环境变量里配 `MP_STATE=trial` 或 `developer`。
+- **借阅列表 / 借阅记录页空白？** 检查是否重新部署了 `borrowManager`（`adminBorrows`、`bookBorrows` 是新增 action），以及 `borrows` 集合权限是否已设为「所有用户不可读写」。
+- **换了集合权限后「我的借阅」打不开？** 该功能走 `myBorrows` 云函数，不受客户端规则影响；若报错请确认 `borrowManager` 已部署。
 - **如何重置本地数据？** 开发者工具「清除缓存 → 清除数据缓存」恢复种子数据。
 - **云模式借阅失败？** 确认已部署 `login` / `borrowManager`，且 `books`/`borrows` 集合已创建。
 - **消息中心一直空的？** 通知只由业务动作产生（借阅通过、审批结果、逾期提醒、群发、书评回复）。先去管理端「发送通知」发一条看红点是否出现。
