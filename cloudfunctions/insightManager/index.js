@@ -40,21 +40,6 @@ function cstToday() {
   return formatCST(new Date(), false);
 }
 
-/** N 天前的东八区 0 点（Date） */
-function daysAgoStart(days) {
-  const t = new Date(Date.now() + 8 * 3600 * 1000);
-  const todayStart = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - 8 * 3600 * 1000;
-  return new Date(todayStart - (days - 1) * 86400000);
-}
-
-/** 生成近 days 天的日期数组（升序） */
-function dayList(days) {
-  const out = [];
-  const start = daysAgoStart(days).getTime();
-  for (let i = 0; i < days; i++) out.push(formatCST(start + i * 86400000, false));
-  return out;
-}
-
 /* ------------------------- 统计区间（预设 / 自定义） ------------------------- */
 // 与 miniprogram/utils/analytics-range.js 保持同一口径，改动需同步两边
 
@@ -206,6 +191,22 @@ function trendOf(items, range, pick) {
   return buckets.map((b, i) => ({ label: b.label, value: counts[i] }));
 }
 
+/**
+ * 按天聚合结果 → 趋势分桶
+ * @param {Array<{_id:string,n:number}>} list $dateToString 聚合出的 [{_id:'2026-08-01', n:3}]
+ */
+function trendOfDayCounts(list, range) {
+  const buckets = buildBuckets(range);
+  const counts = new Array(buckets.length).fill(0);
+  (list || []).forEach((g) => {
+    const ms = dayStartMs(g._id);
+    if (ms === null) return;
+    const idx = bucketIndexOf(ms, range, buckets);
+    if (idx >= 0) counts[idx] += Number(g.n) || 0;
+  });
+  return buckets.map((b, i) => ({ label: b.label, value: counts[i] }));
+}
+
 function sumStocks(stocks) {
   if (!stocks) return 0;
   return Object.keys(stocks).reduce((s, k) => s + (Number(stocks[k]) || 0), 0);
@@ -242,16 +243,36 @@ function toCsv(headers, rows) {
 
 async function doUserStats(event, openid) {
   if (!(await isAdmin(openid))) return { ok: false, msg: '无权限执行此操作' };
-  const days = Math.min(365, Math.max(1, Number(event.days) || 30));
-  const start = daysAgoStart(days);
+  // 与书籍统计同一套区间口径：{ days } 预设近 N 天；{ startDate, endDate } 自定义（含首含尾）
+  const range = resolveRange(event);
+  const start = range.start;
+  const endEx = range.endExclusive;
 
-  const [total, admins, activeCards, pendingCards, newUsers, settingsRes] = await Promise.all([
+  // 新增趋势：按天聚合一次拿完，避免长出几百天时打出几百次 count
+  // $dateToString 在个别旧版 SDK 上可能不存在，此时回退到下方「拉原始数据本地分桶」
+  const dayAggTask =
+    typeof $.dateToString === 'function'
+      ? db
+          .collection('users')
+          .aggregate()
+          .match({ createdAt: _.gte(start).and(_.lt(endEx)) })
+          .group({
+            _id: $.dateToString({ date: '$createdAt', format: '%Y-%m-%d', timezone: '+08:00' }),
+            n: $.sum(1)
+          })
+          .limit(MAX_SPAN_DAYS)
+          .end()
+          .catch(() => ({ list: [] }))
+      : Promise.resolve({ list: [] });
+
+  const [total, admins, activeCards, pendingCards, newUsers, settingsRes, dayAgg] = await Promise.all([
     db.collection('users').count(),
     db.collection('users').where({ role: 'admin' }).count(),
     db.collection('users').where({ 'card.status': 'active' }).count(),
     db.collection('users').where({ 'card.status': 'pending' }).count(),
-    db.collection('users').where({ createdAt: _.gte(start) }).count(),
-    db.collection('settings').doc('global').get().catch(() => ({ data: {} }))
+    db.collection('users').where({ createdAt: _.gte(start).and(_.lt(endEx)) }).count(),
+    db.collection('settings').doc('global').get().catch(() => ({ data: {} })),
+    dayAggTask
   ]);
   const locations = ((settingsRes.data || {}).locations || []).slice();
 
@@ -263,31 +284,27 @@ async function doUserStats(event, openid) {
   }
   byLocation.sort((a, b) => b.value - a.value);
 
-  // 新增趋势（近 N 天每天一条 count，并发执行）
-  const daysArr = dayList(days);
-  const trendCounts = await Promise.all(
-    daysArr.map((d) => {
-      const s = new Date(d + 'T00:00:00+08:00').getTime();
-      return db
-        .collection('users')
-        .where({ createdAt: _.gte(new Date(s)).and(_.lt(new Date(s + 86400000))) })
-        .count()
-        .then((r) => r.total)
-        .catch(() => 0);
-    })
-  );
-  const trend = daysArr.map((d, i) => ({ label: d.slice(5), value: trendCounts[i] }));
+  // 新增用户趋势：优先用聚合结果；聚合拿不到（环境不支持/报错）时回退到区间内原始数据分桶
+  let trend = trendOfDayCounts(dayAgg.list, range);
+  if (!(dayAgg.list || []).length && newUsers.total > 0) {
+    const raw = await db
+      .collection('users')
+      .where({ createdAt: _.gte(start).and(_.lt(endEx)) })
+      .field({ createdAt: true })
+      .limit(1000)
+      .get()
+      .catch(() => ({ data: [] }));
+    trend = trendOf(raw.data, range, (u) => u.createdAt);
+  }
 
   // 区间借阅总量 & 活跃借阅人
+  const borrowMatch = { borrowDate: _.gte(start).and(_.lt(endEx)), status: _.neq('cancelled') };
   const [borrowTotal, borrowerGroups] = await Promise.all([
-    db
-      .collection('borrows')
-      .where({ borrowDate: _.gte(start), status: _.neq('cancelled') })
-      .count(),
+    db.collection('borrows').where(borrowMatch).count(),
     db
       .collection('borrows')
       .aggregate()
-      .match({ borrowDate: _.gte(start), status: _.neq('cancelled') })
+      .match(borrowMatch)
       .group({ _id: '$userId', n: $.sum(1) })
       .sort({ n: -1 })
       .limit(1000)
@@ -335,7 +352,17 @@ async function doUserStats(event, openid) {
   return {
     ok: true,
     data: {
-      days,
+      days: range.days,
+      range: {
+        mode: range.mode,
+        days: range.days,
+        startDate: range.startDate,
+        endDate: range.endDate,
+        unit: range.unit,
+        unitLabel: range.unitLabel,
+        label: range.label,
+        notices: range.notices
+      },
       cards: {
         total: total.total,
         admins: admins.total,
@@ -514,8 +541,10 @@ async function doBookStats(event, openid) {
 
 async function doExportUsers(event, openid) {
   if (!(await isAdmin(openid))) return { ok: false, msg: '无权限执行此操作' };
-  const days = Math.min(365, Math.max(1, Number(event.days) || 30));
-  const start = daysAgoStart(days);
+  // 与统计页同一区间口径，导出的「区间借阅」列与页面数字对得上
+  const range = resolveRange(event);
+  const start = range.start;
+  const endEx = range.endExclusive;
 
   const userRes = await db
     .collection('users')
@@ -548,7 +577,7 @@ async function doExportUsers(event, openid) {
   const inRange = await db
     .collection('borrows')
     .aggregate()
-    .match({ borrowDate: _.gte(start), status: _.neq('cancelled') })
+    .match({ borrowDate: _.gte(start).and(_.lt(endEx)), status: _.neq('cancelled') })
     .group({ _id: '$userId', n: $.sum(1) })
     .limit(EXPORT_MAX)
     .end()
@@ -575,13 +604,13 @@ async function doExportUsers(event, openid) {
   });
 
   const csv = toCsv(
-    ['昵称', '角色', '借书证状态', '归属馆藏', '手机号', '注册时间', '累计借阅', '近' + days + '天借阅', '最近借阅'],
+    ['昵称', '角色', '借书证状态', '归属馆藏', '手机号', '注册时间', '累计借阅', `区间借阅（${range.label}）`, '最近借阅'],
     rows
   );
   return {
     ok: true,
     data: {
-      filename: `用户统计_${cstToday().replace(/-/g, '')}.csv`,
+      filename: `用户统计_${range.startDate.replace(/-/g, '')}-${range.endDate.replace(/-/g, '')}.csv`,
       content: csv,
       rows: rows.length,
       truncated: users.length >= EXPORT_MAX

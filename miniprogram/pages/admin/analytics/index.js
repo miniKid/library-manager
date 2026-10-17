@@ -30,15 +30,16 @@ Page({
     userBars: { location: [], role: [], buckets: [], trend: [] },
     bookBars: { category: [], location: [], rating: [], trend: [] },
     exporting: false,
-    // 书籍统计的时间口径：预设近 N 天 / 自定义起止日期
+    // 时间口径（用户/书籍共用）：预设近 N 天 / 自定义起止日期
     rangeMode: 'preset',
     today: '',
     minDate: '',
     startDate: '',
     endDate: '',
-    bookRangeText: '',
-    bookNewLabel: '',
-    bookUnitLabel: '按天'
+    rangeText: '近 30 天',
+    userNewLabel: '近 30 天新增',
+    bookNewLabel: '近 30 天新增',
+    trendUnitLabel: '按天'
   },
 
   onLoad() {
@@ -66,8 +67,8 @@ Page({
   onTab(e) {
     const tab = e.currentTarget.dataset.tab;
     if (tab === this.data.tab) return;
-    // 自定义区间只对书籍统计生效，切回用户统计时回到预设口径
-    this.setData({ tab, rangeMode: tab === 'user' ? 'preset' : this.data.rangeMode });
+    // 时间口径两个 Tab 共用，切换时保留当前选择
+    this.setData({ tab });
     this.load();
   },
 
@@ -121,69 +122,84 @@ Page({
     }));
   },
 
-  /** 书籍统计的入参：自定义区间优先，否则用预设天数 */
-  bookParams() {
+  /** 统计入参：自定义区间优先，否则用预设天数（用户/书籍共用） */
+  rangeParams() {
     if (this.data.rangeMode === 'custom') {
       return { startDate: this.data.startDate, endDate: this.data.endDate };
     }
     return this.data.days;
   },
 
+  /** 服务端可能把越界日期收敛过，回写以保持选择器与实际口径一致；返回需要合并的字段 */
+  rangePatch(range) {
+    const r = range || {};
+    const days = r.days || this.data.days;
+    const custom = r.mode === 'custom';
+    const patch = {
+      rangeText: r.label || `近 ${days} 天`,
+      userNewLabel: custom ? '区间新增' : `近 ${days} 天新增`,
+      bookNewLabel: custom ? '区间新增' : `近 ${days} 天新增`,
+      trendUnitLabel: r.unitLabel || '按天'
+    };
+    if (custom && r.startDate && r.endDate) {
+      patch.startDate = r.startDate;
+      patch.endDate = r.endDate;
+    }
+    return patch;
+  },
+
   async load() {
     if (this.data.loading) return;
     this.setData({ loading: true, error: '' });
+    const params = this.rangeParams();
     if (this.data.tab === 'user') {
-      const data = await services.getUserStats(this.data.days);
+      const data = await services.getUserStats(params);
       if (data.error) {
         this.setData({ loading: false, error: data.error });
         return;
       }
-      this.setData({
-        user: data,
-        userBars: {
-          location: this.percent(data.byLocation, 'value'),
-          role: this.percent(data.roleChart, 'value'),
-          buckets: this.percent(data.buckets, 'value'),
-          trend: this.percent(data.trend, 'value')
-        },
-        loading: false
-      });
-    } else {
-      const data = await services.getBookStats(this.bookParams());
-      if (data.error) {
-        this.setData({ loading: false, error: data.error });
-        return;
-      }
-      const range = data.range || {};
-      const patch = {
-        book: data,
-        bookBars: {
-          category: this.percent(data.categoryChart, 'value'),
-          location: this.percent(data.byLocation, 'value'),
-          rating: this.percent(data.ratingChart, 'value'),
-          trend: this.percent(data.trend, 'value')
-        },
-        bookRangeText: range.label || `近 ${data.days || this.data.days} 天`,
-        bookNewLabel: range.mode === 'custom' ? '区间新增' : `近 ${range.days || data.days} 天新增`,
-        bookUnitLabel: range.unitLabel || '按天',
-        loading: false
+      const patch = this.rangePatch(data.range);
+      patch.user = data;
+      patch.userBars = {
+        location: this.percent(data.byLocation, 'value'),
+        role: this.percent(data.roleChart, 'value'),
+        buckets: this.percent(data.buckets, 'value'),
+        trend: this.percent(data.trend, 'value')
       };
-      // 服务端可能把越界日期收敛过，回写以保持选择器与实际口径一致
-      if (range.mode === 'custom' && range.startDate && range.endDate) {
-        patch.startDate = range.startDate;
-        patch.endDate = range.endDate;
-      }
+      patch.loading = false;
       this.setData(patch);
-      const notices = (range.notices || []).filter(Boolean);
-      if (notices.length) wx.showToast({ title: notices[0], icon: 'none', duration: 2500 });
+      this.toastNotices(data.range);
+    } else {
+      const data = await services.getBookStats(params);
+      if (data.error) {
+        this.setData({ loading: false, error: data.error });
+        return;
+      }
+      const patch = this.rangePatch(data.range);
+      patch.book = data;
+      patch.bookBars = {
+        category: this.percent(data.categoryChart, 'value'),
+        location: this.percent(data.byLocation, 'value'),
+        rating: this.percent(data.ratingChart, 'value'),
+        trend: this.percent(data.trend, 'value')
+      };
+      patch.loading = false;
+      this.setData(patch);
+      this.toastNotices(data.range);
     }
+  },
+
+  toastNotices(range) {
+    const notices = ((range && range.notices) || []).filter(Boolean);
+    if (notices.length) wx.showToast({ title: notices[0], icon: 'none', duration: 2500 });
   },
 
   async onExport() {
     if (this.data.exporting) return;
     this.setData({ exporting: true });
     const isUser = this.data.tab === 'user';
-    const res = isUser ? await services.exportUsersCsv(this.data.days) : await services.exportBooksCsv(this.data.days);
+    const params = this.rangeParams();
+    const res = isUser ? await services.exportUsersCsv(params) : await services.exportBooksCsv(this.data.days);
     if (!res || res.error) {
       this.setData({ exporting: false });
       wx.showToast({ title: (res && res.error) || '导出失败', icon: 'none' });

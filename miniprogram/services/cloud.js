@@ -654,25 +654,32 @@ function adminRemoveReview(reviewId) {
 
 /* ---------- 统计与导出 ---------- */
 
-async function getUserStats(days = 30) {
-  const r = await invoke('insightManager', { action: 'userStats', days });
+/** 统计入参归一：数字 → { days }；对象 → { days, startDate, endDate } */
+function rangePayload(input, fallbackDays) {
+  if (typeof input === 'number') return { days: input };
+  const opt = input || {};
+  return {
+    days: typeof opt.days === 'number' ? opt.days : fallbackDays,
+    startDate: opt.startDate,
+    endDate: opt.endDate
+  };
+}
+
+/** 用户统计：传数字按「近 N 天」，传 { startDate, endDate } 按自定义区间（含首含尾） */
+async function getUserStats(input = 30) {
+  const r = await invoke('insightManager', Object.assign({ action: 'userStats' }, rangePayload(input, 30)));
   return r.ok ? r.data : { error: r.msg || '统计失败' };
 }
 
 /** 书籍统计：传数字按「近 N 天」，传 { startDate, endDate } 按自定义区间（含首含尾） */
 async function getBookStats(input = 30) {
-  const payload = typeof input === 'number' ? { days: input } : input || { days: 30 };
-  const r = await invoke('insightManager', {
-    action: 'bookStats',
-    days: payload.days,
-    startDate: payload.startDate,
-    endDate: payload.endDate
-  });
+  const r = await invoke('insightManager', Object.assign({ action: 'bookStats' }, rangePayload(input, 30)));
   return r.ok ? r.data : { error: r.msg || '统计失败' };
 }
 
-async function exportUsersCsv(days = 30) {
-  const r = await invoke('insightManager', { action: 'exportUsers', days });
+/** 用户统计 CSV：区间口径与 getUserStats 一致 */
+async function exportUsersCsv(input = 30) {
+  const r = await invoke('insightManager', Object.assign({ action: 'exportUsers' }, rangePayload(input, 30)));
   return r.ok ? r.data : { error: r.msg || '导出失败' };
 }
 

@@ -12,14 +12,14 @@
       data-days="{{item.days}}"
       bindtap="onRange"
     >{{item.label}}</view>
-    <view wx:if="{{tab === 'book'}}" class="chip {{rangeMode === 'custom' ? 'chip-on' : ''}}" bindtap="onCustomRange">自定义</view>
+    <view class="chip {{rangeMode === 'custom' ? 'chip-on' : ''}}" bindtap="onCustomRange">自定义</view>
   </view>
 
-  <!-- 书籍统计：自定义起止日期 -->
-  <view wx:if="{{tab === 'book'}}" class="range-panel">
+  <!-- 统计区间：用户/书籍共用同一套时间口径 -->
+  <view class="range-panel">
     <view class="range-panel-head">
       <text class="range-panel-title">统计区间</text>
-      <text class="range-panel-now">{{bookRangeText}}</text>
+      <text class="range-panel-now">{{rangeText}}</text>
     </view>
     <view wx:if="{{rangeMode === 'custom'}}" class="range-pickers">
       <picker mode="date" value="{{startDate}}" start="{{minDate}}" end="{{today}}" bindchange="onStartDate">
@@ -61,7 +61,7 @@
       </view>
       <view class="stat-card">
         <view class="stat-num">{{user.cards.newUsers}}</view>
-        <view class="stat-label">近{{days}}天新增</view>
+        <view class="stat-label">{{userNewLabel}}</view>
       </view>
       <view class="stat-card">
         <view class="stat-num">{{user.cards.perCapita}}</view>
@@ -99,16 +99,17 @@
     </view>
 
     <view class="card">
-      <view class="section-title">每日新增用户</view>
-      <view class="vchart">
+      <view class="section-title">新增用户趋势（{{trendUnitLabel}}）</view>
+      <view wx:if="{{userBars.trend.length}}" class="vchart">
         <view wx:for="{{userBars.trend}}" wx:key="label" class="vbar-wrap">
           <view class="vbar" style="height: {{item.percent}}%"></view>
         </view>
       </view>
-      <view class="vaxis">
+      <view wx:if="{{userBars.trend.length}}" class="vaxis">
         <text>{{userBars.trend[0].label}}</text>
         <text wx:if="{{userBars.trend.length > 1}}">{{userBars.trend[userBars.trend.length - 1].label}}</text>
       </view>
+      <view wx:if="{{!userBars.trend.length}}" class="chart-empty">该区间没有新增用户</view>
     </view>
 
     <view class="card">
@@ -121,7 +122,7 @@
         </view>
         <text class="rank-num">{{item.count}} 次</text>
       </view>
-      <view wx:if="{{!user.topBorrowers.length}}" class="chart-empty">近{{days}}天暂无借阅</view>
+      <view wx:if="{{!user.topBorrowers.length}}" class="chart-empty">该区间暂无借阅</view>
     </view>
   </block>
 
@@ -174,7 +175,7 @@
     </view>
 
     <view class="card">
-      <view class="section-title">新增书籍趋势（{{bookUnitLabel}}）</view>
+      <view class="section-title">新增书籍趋势（{{trendUnitLabel}}）</view>
       <view wx:if="{{bookBars.trend.length}}" class="vchart">
         <view wx:for="{{bookBars.trend}}" wx:key="label" class="vbar-wrap">
           <view class="vbar" style="height: {{item.percent}}%"></view>

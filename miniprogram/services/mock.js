@@ -1462,19 +1462,6 @@ async function adminReplyReview(reviewId, content) {
 
 /* ---------------- 统计与导出 ---------------- */
 
-function daysAgo(days) {
-  return Date.now() - (days - 1) * 86400000;
-}
-
-function bucketTrend(items, days, pick) {
-  const out = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = cstDateStr(Date.now() - i * 86400000);
-    out.push({ label: d.slice(5), value: items.filter((x) => cstDateStr(pick(x)) === d).length });
-  }
-  return out;
-}
-
 function toCsv(headers, rows) {
   const esc = (v) => {
     const s = v === null || v === undefined ? '' : String(v);
@@ -1483,14 +1470,23 @@ function toCsv(headers, rows) {
   return '\ufeff' + [headers.map(esc).join(',')].concat(rows.map((r) => r.map(esc).join(','))).join('\r\n');
 }
 
-async function getUserStats(days) {
+async function getUserStats(input) {
   const db = ensureCollections(getDb());
   if (!isAdminMe(db)) return { error: '无权限' };
-  const d = days || 30;
-  const start = daysAgo(d);
+  // 与书籍统计同一套区间口径：数字 = 近 N 天；{ startDate, endDate } = 自定义（含首含尾）
+  const range = rangeUtil.normalizeRange(input);
+  const start = range.startMs;
+  const endEx = range.endExclusiveMs;
   const users = db.users || [];
   const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
-  const inRange = borrows.filter((r) => new Date(r.borrowDate).getTime() >= start);
+  const inRange = borrows.filter((r) => {
+    const t = new Date(r.borrowDate).getTime();
+    return t >= start && t < endEx;
+  });
+  const newUsers = users.filter((u) => {
+    const t = new Date(u.createdAt).getTime();
+    return t >= start && t < endEx;
+  });
 
   const byUserId = {};
   inRange.forEach((r) => {
@@ -1510,13 +1506,23 @@ async function getUserStats(days) {
   ];
 
   return {
-    days: d,
+    days: range.days,
+    range: {
+      mode: range.mode,
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      unit: range.unit,
+      unitLabel: range.unitLabel,
+      label: range.label,
+      notices: range.notices || []
+    },
     cards: {
       total: users.length,
       admins: users.filter((u) => u.role === ROLE.ADMIN).length,
       activeCards,
       pendingCards: users.filter((u) => u.card && u.card.status === CARD_STATUS.PENDING).length,
-      newUsers: users.filter((u) => new Date(u.createdAt).getTime() >= start).length,
+      newUsers: newUsers.length,
       borrowTotal: inRange.length,
       activeBorrowers: groups.length,
       perCapita: groups.length ? Math.round((inRange.length / groups.length) * 10) / 10 : 0
@@ -1527,7 +1533,7 @@ async function getUserStats(days) {
       { label: '管理员', value: users.filter((u) => u.role === ROLE.ADMIN).length }
     ],
     buckets,
-    trend: bucketTrend(users, d, (u) => u.createdAt),
+    trend: rangeUtil.trendOf(users, range, (u) => u.createdAt),
     topBorrowers: groups.slice(0, 20).map((g) => {
       const u = users.find((x) => x.openid === g.id) || {};
       return {
@@ -1636,14 +1642,19 @@ async function getBookStats(input) {
   };
 }
 
-async function exportUsersCsv(days) {
+async function exportUsersCsv(input) {
   const db = ensureCollections(getDb());
   if (!isAdminMe(db)) return { error: '无权限' };
+  const range = rangeUtil.normalizeRange(input);
   const users = db.users || [];
   const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
   const rows = users.map((u) => {
     const mine = borrows.filter((r) => r.userId === u.openid);
     const last = mine.length ? mine[mine.length - 1].borrowDate : null;
+    const inRange = mine.filter((r) => {
+      const t = new Date(r.borrowDate).getTime();
+      return t >= range.startMs && t < range.endExclusiveMs;
+    }).length;
     const card = u.card || {};
     return [
       u.nickname || '',
@@ -1653,12 +1664,13 @@ async function exportUsersCsv(days) {
       String(card.phone || '').replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'),
       formatCST(u.createdAt),
       mine.length,
+      inRange,
       last ? formatCST(last) : ''
     ];
   });
   return {
-    filename: `用户统计_${cstTodayStr().replace(/-/g, '')}.csv`,
-    content: toCsv(['昵称', '角色', '借书证状态', '归属馆藏', '手机号', '注册时间', '累计借阅', '最近借阅'], rows),
+    filename: `用户统计_${range.startDate.replace(/-/g, '')}-${range.endDate.replace(/-/g, '')}.csv`,
+    content: toCsv(['昵称', '角色', '借书证状态', '归属馆藏', '手机号', '注册时间', '累计借阅', `区间借阅（${range.label}）`, '最近借阅'], rows),
     rows: rows.length,
     truncated: false
   };
