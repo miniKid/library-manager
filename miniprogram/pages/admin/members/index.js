@@ -7,7 +7,12 @@ Page({
     users: [],
     filtered: [],
     loading: false,
+    finished: false,
+    total: 0,
+    page: 1,
+    pageSize: 20,
     selfOpenid: '',
+    keyword: '',
     activeFilter: '',
     filters: [
       { key: '', label: '全部' },
@@ -20,8 +25,8 @@ Page({
   onShow() {
     const app = getApp();
     const self = app.globalData.userInfo || {};
-    this.setData({ selfOpenid: self.openid || '' });
-    this.loadUsers();
+    this.setData({ selfOpenid: self.openid || '', keyword: '' });
+    this.loadUsers(true);
   },
 
   fmtTs(v) {
@@ -31,59 +36,97 @@ Page({
     return formatDate(d);
   },
 
-  async loadUsers() {
+  async loadUsers(reset = true) {
+    if (this.data.loading) return;
+    const page = reset ? 1 : this.data.page;
     this.setData({ loading: true });
-    const raw = await services.getUsers();
-    const selfOpenid = this.data.selfOpenid;
-    const users = (raw || []).map((u) => {
-      const isAdmin = u.role === ROLE.ADMIN;
-      const card = u.card || {};
-      // 借书证按其真实状态展示：管理员身份只是叠加的管理权限，不豁免借书证规则
-      const status = card.status || CARD_STATUS.NONE;
-      let cardText = '';
-      let cardDesc = '';
-      if (status === CARD_STATUS.PENDING) {
-        cardText = '待审批';
-        cardDesc = '申请借书证：手机号 ' + (card.phone || '') + ' · ' + (card.location || '') + ' · 申请于 ' + this.fmtTs(card.applyDate);
-      } else if (status === CARD_STATUS.ACTIVE) {
-        cardText = '已开通';
-        const idText = card.phone ? '手机号 ' + card.phone + ' · ' : '';
-        cardDesc = idText + '仅可借「' + (card.location || '') + '」馆藏';
-      } else if (status === CARD_STATUS.REJECTED) {
-        cardText = '已驳回';
-        cardDesc = (card.rejectReason || '资料不符合要求') + '（可重新申请）';
-      } else {
-        cardText = '未开通';
-        cardDesc = '尚未申请借书证，仅可浏览';
-      }
-      return {
-        _id: u._id,
-        openid: u.openid,
-        nickname: u.nickname || '微信用户',
-        avatarUrl: u.avatarUrl || '',
-        isAdmin,
-        isSelf: u.openid === selfOpenid,
-        cardStatus: status,
-        cardText,
-        cardDesc,
-        coverChar: (u.nickname || '微').charAt(0)
-      };
-    });
-    this.setData({ users, loading: false }, () => this.applyFilter());
+    const role = this.data.activeFilter === 'admin' ? ROLE.ADMIN
+      : this.data.activeFilter === 'reader' ? ROLE.USER : '';
+    const cardStatus = this.data.activeFilter === 'pending' ? CARD_STATUS.PENDING : '';
+    try {
+      const res = await services.getUsers({
+        keyword: this.data.keyword.trim(),
+        role,
+        cardStatus,
+        page,
+        pageSize: this.data.pageSize
+      });
+      const list = (res && res.list) || [];
+      const total = (res && res.total) || 0;
+      const mapped = list.map((u) => this.mapUser(u));
+      const nextUsers = reset ? mapped : this.data.users.concat(mapped);
+      this.setData({
+        users: nextUsers,
+        filtered: nextUsers,
+        page: page + 1,
+        total,
+        finished: page * this.data.pageSize >= total,
+        loading: false
+      });
+    } catch (e) {
+      console.error('[admin/members] loadUsers error:', e);
+      this.setData({ loading: false });
+      wx.showToast({ title: '加载失败', icon: 'none' });
+    }
+  },
+
+  mapUser(u) {
+    const isAdmin = u.role === ROLE.ADMIN;
+    const card = u.card || {};
+    // 借书证按其真实状态展示：管理员身份只是叠加的管理权限，不豁免借书证规则
+    const status = card.status || CARD_STATUS.NONE;
+    let cardText = '';
+    let cardDesc = '';
+    if (status === CARD_STATUS.PENDING) {
+      cardText = '待审批';
+      cardDesc = '申请借书证：手机号 ' + (card.phone || '') + ' · ' + (card.location || '') + ' · 申请于 ' + this.fmtTs(card.applyDate);
+    } else if (status === CARD_STATUS.ACTIVE) {
+      cardText = '已开通';
+      const idText = card.phone ? '手机号 ' + card.phone + ' · ' : '';
+      cardDesc = idText + '仅可借「' + (card.location || '') + '」馆藏';
+    } else if (status === CARD_STATUS.REJECTED) {
+      cardText = '已驳回';
+      cardDesc = (card.rejectReason || '资料不符合要求') + '（可重新申请）';
+    } else {
+      cardText = '未开通';
+      cardDesc = '尚未申请借书证，仅可浏览';
+    }
+    return {
+      _id: u._id,
+      openid: u.openid,
+      nickname: u.nickname || '微信用户',
+      isAdmin,
+      isSelf: u.openid === this.data.selfOpenid,
+      cardStatus: status,
+      cardText,
+      cardDesc
+    };
+  },
+
+  onReachBottom() {
+    if (!this.data.finished && !this.data.loading) {
+      this.loadUsers(false);
+    }
   },
 
   onFilter(e) {
     const key = e.currentTarget.dataset.key || '';
-    this.setData({ activeFilter: key }, () => this.applyFilter());
+    this.setData({ activeFilter: key }, () => this.loadUsers(true));
   },
 
-  applyFilter() {
-    const key = this.data.activeFilter;
-    let list = this.data.users;
-    if (key === 'reader') list = list.filter((u) => !u.isAdmin);
-    else if (key === 'admin') list = list.filter((u) => u.isAdmin);
-    else if (key === 'pending') list = list.filter((u) => u.cardStatus === CARD_STATUS.PENDING);
-    this.setData({ filtered: list });
+  onKeywordInput(e) {
+    this.setData({ keyword: e.detail.value });
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.loadUsers(true), 400);
+  },
+
+  onSearch() {
+    if (this.timer) clearTimeout(this.timer);
+    this.loadUsers(true);
+  },
+
+  onClearKeyword() {
+    this.setData({ keyword: '' }, () => this.loadUsers(true));
   },
 
   confirmAction(content, handler) {

@@ -1,0 +1,28 @@
+.section-title { font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; }
+.scope-row { display: flex; margin-bottom: 10rpx; }
+.chip {
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--c-text-2);
+  font-size: 26rpx;
+  border: 1rpx solid var(--c-line);
+  margin-right: 16rpx;
+}
+.chip-on { background: rgba(43, 91, 132, 0.1); color: var(--c-primary-2); border-color: var(--c-primary-2); }
+.tip { font-size: 22rpx; color: var(--c-text-3); line-height: 1.6; margin-top: 12rpx; }
+.form-item-area { align-items: flex-start; }
+.form-area {
+  flex: 1;
+  height: 180rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+.send-btn { margin: 10rpx 0 40rpx; }
+.history-title { margin-top: 20rpx; }
+.count { font-size: 22rpx; color: var(--c-text-3); font-weight: 400; }
+.record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10rpx; }
+.record-title { font-size: 28rpx; font-weight: 500; }
+.record-count { font-size: 22rpx; color: var(--c-primary-2); }
+.record-body { font-size: 26rpx; color: var(--c-text-2); line-height: 1.6; }
+.record-foot { display: flex; gap: 12rpx; font-size: 22rpx; color: var(--c-text-3); margin-top: 12rpx; }

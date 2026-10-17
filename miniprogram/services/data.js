@@ -46,11 +46,19 @@ function buildSeed() {
         stocks,
         status: Object.keys(stocks).some((k) => stocks[k] > 0) ? 'available' : 'borrowed',
         createdAt: now - (seedBooks.length - i) * 86400000,
-        borrowCount: 0
+        borrowCount: 0,
+        ratingAvg: 0,
+        ratingCount: 0,
+        reviewCount: 0
       };
     }),
     borrows: [],
     users: [],
+    // 第二期新增集合（本地模拟与云端保持同名）
+    reviews: [],
+    notifications: [],
+    todos: [],
+    noticeLogs: [],
     settings: {
       _id: 'global',
       locations: DEFAULT_LOCATIONS.slice(),

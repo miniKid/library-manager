@@ -29,7 +29,9 @@ Page({
       canNext: false,
       weeks: []
     },
-    WEEKDAYS
+    WEEKDAYS,
+    reviewSummary: { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] },
+    reviewPreview: []
   },
 
   onLoad(options) {
@@ -38,6 +40,27 @@ Page({
     this.loadSettings();
     this.loadBook();
     this.loadSchedules();
+    this.loadReviews();
+  },
+
+  /** 书评概览 + 前 3 条（完整列表在 book-reviews 页） */
+  async loadReviews() {
+    if (!this.id) return;
+    try {
+      const res = await services.getReviews({ bookId: this.id, page: 1, pageSize: 3 });
+      const list = (res.list || []).map((r) => Object.assign({}, r, { initial: String(r.userName || '读').charAt(0) }));
+      this.setData({
+        reviewSummary: res.summary || { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] },
+        reviewPreview: list
+      });
+    } catch (e) {
+      // 评论加载失败不影响详情页主流程
+    }
+  },
+
+  goReviews() {
+    const title = encodeURIComponent((this.data.book && this.data.book.title) || '');
+    wx.navigateTo({ url: `/pages/book-reviews/index?bookId=${this.id}&title=${title}` });
   },
 
   onShow() {
@@ -240,12 +263,14 @@ Page({
       return;
     }
     // 必须在用户点击的同步执行链内发起订阅（任何 await 之后调用都会报 can only be invoked by user TAP gesture）。
-    // 一次传入两个模板，真机上会合并成一个弹窗让用户逐个勾选（与多数小程序一致）。
+    // 一次传入三个模板，真机上会合并成一个弹窗让用户逐个勾选（与多数小程序一致）。
     // 注意：微信开发者工具「模拟器」对 requestSubscribeMessage 仅支持第一个模板（官方已知限制，
     // 见社区帖 mac开发者工具模拟器使用 requestSubscribeMessage 不支持多个模板），因此在模拟器里只会看到第一个；
-    // 要验证两个模板都出现，请用「真机调试」。
+    // 要验证三个模板都出现，请用「真机调试」。
+    // 第三个模板 OVERDUE_REMIND 为「逾期提醒」，由管理员在借阅管理页手动触发；用户在此处一并授权，
+    // 可随每次借阅累加一次额度（也可后续在小程序内增加订阅按钮继续累加）。
     const subPromise = wx.requestSubscribeMessage({
-      tmplIds: [TEMPLATE_ID.BORROW_OK, TEMPLATE_ID.RETURN_REMIND]
+      tmplIds: [TEMPLATE_ID.BORROW_OK, TEMPLATE_ID.RETURN_REMIND, TEMPLATE_ID.OVERDUE_REMIND]
     }).catch((e) => { console.error('[订阅授权异常]', e); return null; });
 
     wx.showLoading({ title: '提交中' });

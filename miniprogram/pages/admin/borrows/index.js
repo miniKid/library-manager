@@ -11,14 +11,16 @@ const STATUS_MAP = {
   [BORROW_STATUS.CANCELLED]: { text: '已取消', cls: 'tag-gray' }
 };
 
+// 页签文案压到 2-3 字，保证单行不折行；countKey 对应 getBorrowStatusCounts 的字段
+// danger=true 表示「有活要干」的队列，数量标红
 const FILTERS = [
-  { key: '', label: '全部' },
-  { key: BORROW_STATUS.PENDING, label: '待确认借出' },
-  { key: BORROW_STATUS.BORROWING, label: '借出中' },
-  { key: BORROW_STATUS.RETURN_REQUESTED, label: '待确认归还' },
-  { key: BORROW_STATUS.OVERDUE, label: '已逾期' },
-  { key: BORROW_STATUS.RETURNED, label: '已归还' },
-  { key: BORROW_STATUS.CANCELLED, label: '已取消' }
+  { key: '', label: '全部', countKey: 'all' },
+  { key: BORROW_STATUS.PENDING, label: '待借出', countKey: 'pending', danger: true },
+  { key: BORROW_STATUS.BORROWING, label: '借出中', countKey: 'borrowing' },
+  { key: BORROW_STATUS.RETURN_REQUESTED, label: '待归还', countKey: 'return_requested', danger: true },
+  { key: BORROW_STATUS.OVERDUE, label: '逾期', countKey: 'overdue', danger: true },
+  { key: BORROW_STATUS.RETURNED, label: '已归还', countKey: 'returned' },
+  { key: BORROW_STATUS.CANCELLED, label: '已取消', countKey: 'cancelled' }
 ];
 
 Page({
@@ -26,7 +28,9 @@ Page({
     filters: FILTERS,
     activeFilter: '',
     borrows: [],
-    loading: false
+    loading: false,
+    scrollInto: '',
+    emptyText: '暂无借阅记录'
   },
 
   onLoad(options) {
@@ -34,7 +38,7 @@ Page({
     const validKeys = FILTERS.map((f) => f.key);
     const status = options && options.status;
     if (status && validKeys.indexOf(status) !== -1) {
-      this.setData({ activeFilter: status });
+      this.setData({ activeFilter: status, scrollInto: 'chip-' + status });
     }
   },
 
@@ -43,13 +47,29 @@ Page({
   },
 
   onFilter(e) {
-    this.setData({ activeFilter: e.currentTarget.dataset.key });
+    const key = e.currentTarget.dataset.key;
+    if (key === this.data.activeFilter) return;
+    this.setData({ activeFilter: key, scrollInto: 'chip-' + (key || 'all') });
     this.loadBorrows();
+  },
+
+  /** 页签数组：把数量合并进去，数量为 0 时页面不渲染徽标 */
+  buildFilters(counts) {
+    const c = counts || {};
+    const filters = FILTERS.map((f) => Object.assign({}, f, { count: Number(c[f.countKey]) || 0 }));
+    const hit = filters.filter((f) => f.key === this.data.activeFilter)[0];
+    return {
+      filters,
+      emptyText: hit && hit.key ? '暂无「' + hit.label + '」的记录' : '暂无借阅记录'
+    };
   },
 
   async loadBorrows() {
     this.setData({ loading: true });
-    const list = await services.getBorrows({ status: this.data.activeFilter });
+    const [list, counts] = await Promise.all([
+      services.getBorrows({ status: this.data.activeFilter }),
+      services.getBorrowStatusCounts()
+    ]);
     const mapped = list.map((r) => ({
       ...r,
       coverBg: hashColor(r.bookTitle),
@@ -59,7 +79,7 @@ Page({
       dueDateText: formatCST(r.dueDate),
       returnDateText: r.returnDate ? formatDate(r.returnDate, true) : ''
     }));
-    this.setData({ borrows: mapped, loading: false });
+    this.setData(Object.assign({ borrows: mapped, loading: false }, this.buildFilters(counts)));
   },
 
   onConfirmBorrow(e) {
@@ -129,6 +149,28 @@ Page({
           this.loadBorrows();
         } else {
           wx.showToast({ title: (result && result.msg) || '操作失败', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  /** 管理员手动发送逾期提醒订阅消息给借阅人 */
+  onSendOverdueRemind(e) {
+    const { id, bookTitle } = e.currentTarget.dataset;
+    wx.showModal({
+      title: '逾期提醒',
+      content: '向《' + bookTitle + '》借阅人发送逾期提醒订阅消息？',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '发送中' });
+        const result = await services.sendOverdueRemind(id);
+        wx.hideLoading();
+        if (result && result.ok) {
+          wx.showToast({ title: '已发送逾期提醒', icon: 'success' });
+        } else if (result && result.code === 'NO_GRANT') {
+          wx.showModal({ title: '无法发送', content: (result.msg || '该用户未订阅逾期提醒'), showCancel: false });
+        } else {
+          wx.showToast({ title: (result && result.msg) || '发送失败', icon: 'none' });
         }
       }
     });

@@ -132,21 +132,42 @@ test('静态检查：借阅列表接口均输出 deliverDateText 交付时间字
   assert.ok(m1 >= 0 && m2 >= 0 && m3 >= 0, 'mock.js 应包含对应函数');
   assert.ok(mockJs.slice(m1, m3).includes('deliverDateText'), 'mock.js getMyBorrows/getBorrows 应输出 deliverDateText');
 
-  // cloud.js：getBorrows 函数体
-  const c1 = cloudJs.indexOf('async function getBorrows');
-  const c2 = cloudJs.indexOf('async function getBookOccupied');
-  assert.ok(c1 >= 0 && c2 >= 0, 'cloud.js 应包含对应函数');
-  assert.ok(cloudJs.slice(c1, c2).includes('deliverDateText'), 'cloud.js getBorrows 应输出 deliverDateText');
-
   // 云函数：doMyBorrows 函数体
   const f1 = fnJs.indexOf('async function doMyBorrows');
+  const f2 = fnJs.indexOf('exports.main');
+  assert.ok(f1 >= 0 && f2 >= 0, '云函数应包含 doMyBorrows');
+  assert.ok(fnJs.slice(f1, f2).includes('deliverDateText'), '云函数 doMyBorrows 应输出 deliverDateText');
 
-test('静态检查：cloud.js getBorrows 将 overdue 视为 borrowing 派生状态（回归逾期列表为空）', () => {
+  // 管理端列表已收回云函数：文案由 decorateBorrow 统一拼装
+  const d1 = fnJs.indexOf('function decorateBorrow');
+  const d2 = fnJs.indexOf('async function doAdminBorrows');
+  assert.ok(d1 >= 0 && d2 > d1, '云函数应有 decorateBorrow 统一出参');
+  assert.ok(fnJs.slice(d1, d2).includes('deliverDateText'), '云函数 decorateBorrow 应输出 deliverDateText');
+});
+
+test('静态检查：借阅查询走云函数，客户端不再直读 borrows（回归隐私泄露 / 逾期列表为空）', () => {
+  // 客户端不得再直连 borrows：该集合权限已收紧为「仅云函数可读写」
+  assert.ok(!/collection\('borrows'\)/.test(cloudJs), 'cloud.js 不应直连 borrows 集合');
+
   const c1 = cloudJs.indexOf('async function getBorrows');
   const c2 = cloudJs.indexOf('async function getBookOccupied');
   const body = cloudJs.slice(c1, c2);
-  assert.ok(body.includes('BORROW_STATUS.OVERDUE ? BORROW_STATUS.BORROWING'), 'cloud.js 应将 overdue 查询映射为 borrowing 后再查');
-  assert.ok(body.includes('status !== BORROW_STATUS.OVERDUE'), 'cloud.js 应在筛选 overdue 时按到期日过滤（而非用不存在的 overdue 状态去查）');
+  assert.ok(body.includes("action: 'adminBorrows'"), 'getBorrows 应调用云函数 adminBorrows');
+  assert.ok(body.includes("action: 'bookBorrows'"), 'getBorrowsByBook 应调用云函数 bookBorrows');
+
+  // 逾期是 borrowing 的派生状态：查询时映射为 borrowing，再按应还日期过滤
+  const f1 = fnJs.indexOf('async function doAdminBorrows');
+  const f2 = fnJs.indexOf('async function doBookBorrows');
+  assert.ok(f1 >= 0 && f2 > f1, '云函数应实现 doAdminBorrows / doBookBorrows');
+  const seg = fnJs.slice(f1, f2);
+  assert.ok(seg.includes("status === 'overdue' ? BORROW_STATUS.BORROWING"), '应将 overdue 查询映射为 borrowing 后再查');
+  assert.ok(seg.includes("status === 'overdue'"), '筛选 overdue 时应按到期日过滤');
+  // 云函数的 BORROW_STATUS 只有 5 个落库状态，没有 OVERDUE 键；写成 BORROW_STATUS.OVERDUE 会得到 undefined
+  assert.ok(!/BORROW_STATUS\.OVERDUE/.test(fnJs), '逾期是派生值，云函数内必须用字面量 overdue（BORROW_STATUS 无该键）');
+
+  // 两个新 action 都必须做管理员校验（原客户端直查没有任何服务端校验）
+  assert.ok(/case 'adminBorrows':[\s\S]{0,160}isAdmin\(OPENID\)/.test(fnJs), 'adminBorrows 应校验管理员');
+  assert.ok(/case 'bookBorrows':[\s\S]{0,160}isAdmin\(OPENID\)/.test(fnJs), 'bookBorrows 应校验管理员');
 });
 
 test('静态检查：管理首页卡片深链到借阅管理具体 tab（data-status + onLoad 预设）', () => {
@@ -211,10 +232,6 @@ test('静态检查：续借功能接线（借阅人申请 + 管理员馆藏配�
   assert.ok(mockJs.includes('async function renewBorrow'), 'mock.js 应实现 renewBorrow');
   assert.ok(fnJs.includes("case 'renewBorrow':"), '云函数应分发 renewBorrow 动作');
   assert.ok(fnJs.includes('async function doRenewBorrow'), '云函数应实现 doRenewBorrow');
-});
-  const f2 = fnJs.indexOf('exports.main');
-  assert.ok(f1 >= 0 && f2 >= 0, '云函数应包含 doMyBorrows');
-  assert.ok(fnJs.slice(f1, f2).includes('deliverDateText'), '云函数 doMyBorrows 应输出 deliverDateText');
 });
 
 test('静态检查：确认借出写入 deliverDate 且不覆盖 borrowDate（回归申请时间被覆盖）', () => {

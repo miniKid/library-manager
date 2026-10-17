@@ -1,0 +1,156 @@
+<view class="container">
+  <view class="tabs">
+    <view class="tab {{tab === 'notice' ? 'tab-on' : ''}}" data-tab="notice" bindtap="onTab">
+      通知<text wx:if="{{unread}}" class="badge">{{unread > 99 ? '99+' : unread}}</text>
+    </view>
+    <view class="tab {{tab === 'todo' ? 'tab-on' : ''}}" data-tab="todo" bindtap="onTab">待办</view>
+  </view>
+
+  <view wx:if="{{!logged}}" class="empty">
+    <view class="empty-icon">🔒</view>
+    <view>登录后查看通知与待办</view>
+    <button class="btn-primary login-btn" bindtap="goLogin">立即登录</button>
+  </view>
+
+  <!-- ============ 通知 ============ -->
+  <block wx:if="{{logged && tab === 'notice'}}">
+    <view class="toolbar">
+      <view class="chip {{onlyUnread ? 'chip-on' : ''}}" bindtap="onToggleUnread">{{onlyUnread ? '只看未读' : '全部通知'}}</view>
+      <view class="toolbar-right">
+        <text wx:if="{{unread}}" class="link" bindtap="onMarkAll">全部已读</text>
+        <text class="link" bindtap="onOpenPrefs">通知设置</text>
+      </view>
+    </view>
+
+    <view wx:if="{{!notices.length}}" class="empty">
+      <view class="empty-icon">📭</view>
+      <view>{{onlyUnread ? '没有未读通知' : '暂无通知'}}</view>
+    </view>
+
+    <view
+      wx:for="{{notices}}"
+      wx:key="_id"
+      class="card notice {{item.read ? '' : 'notice-unread'}}"
+      data-id="{{item._id}}"
+      data-link="{{item.link}}"
+      bindtap="onTapNotice"
+    >
+      <view class="notice-head">
+        <text class="tag {{item.typeColor}}">{{item.typeLabel}}</text>
+        <text class="notice-time">{{item.createdAtText}}</text>
+      </view>
+      <view class="notice-title">{{item.title}}</view>
+      <view wx:if="{{item.content}}" class="notice-body ellipsis-2">{{item.content}}</view>
+      <view wx:if="{{!item.read}}" class="dot"></view>
+    </view>
+
+    <view wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</view>
+    <view wx:if="{{notices.length && !hasMore}}" class="more more-end">没有更多了</view>
+  </block>
+
+  <!-- ============ 待办 ============ -->
+  <block wx:if="{{logged && tab === 'todo'}}">
+    <view class="toolbar">
+      <view class="toolbar-tip">{{todos.today}} · 共 {{todos.system.length + todos.active.length}} 项待处理</view>
+      <view class="link" bindtap="openTodoSheet">+ 新建待办</view>
+    </view>
+
+    <view wx:if="{{todos.system.length}}" class="section-title">系统提醒</view>
+    <view
+      wx:for="{{todos.system}}"
+      wx:key="id"
+      class="card todo todo-sys"
+      data-link="{{item.link}}"
+      bindtap="onTapSystemTodo"
+    >
+      <view class="todo-main">
+        <view class="todo-title">{{item.title}}</view>
+        <view class="todo-desc">{{item.desc}}</view>
+        <view wx:if="{{item.dueDateText}}" class="todo-date">日期：{{item.dueDateText}}</view>
+      </view>
+      <text class="todo-arrow">›</text>
+    </view>
+
+    <view class="section-title">我的待办<text wx:if="{{todos.active.length}}" class="section-count">{{todos.active.length}}</text></view>
+
+    <view wx:if="{{!todos.active.length}}" class="empty empty-sm">
+      <view class="empty-icon">✅</view>
+      <view>没有待处理事项，点右上角新建</view>
+    </view>
+
+    <view wx:for="{{todos.active}}" wx:key="id" class="card todo {{item.overdue ? 'todo-overdue' : ''}}">
+      <view class="check" data-id="{{item.id}}" data-done="{{item.done}}" catchtap="onToggleTodo"></view>
+      <view class="todo-main">
+        <view class="todo-title">
+          <text wx:if="{{item.priority === 'high'}}" class="tag tag-red">高</text>
+          <text wx:if="{{item.priority === 'low'}}" class="tag tag-gray">低</text>
+          {{item.title}}
+        </view>
+        <view wx:if="{{item.desc}}" class="todo-desc">{{item.desc}}</view>
+        <view wx:if="{{item.dueDateText}}" class="todo-date {{item.overdue ? 'todo-date-danger' : ''}}">
+          {{item.overdue ? '已逾期 ' + item.overdueDays + ' 天' : '截止 ' + item.dueDateText}}
+        </view>
+      </view>
+      <text class="todo-del" data-id="{{item.id}}" catchtap="onRemoveTodo">×</text>
+    </view>
+
+    <view wx:if="{{todos.done.length}}" class="section-title">已完成</view>
+    <view wx:for="{{todos.done}}" wx:key="id" class="card todo todo-done">
+      <view class="check check-on" data-id="{{item.id}}" data-done="{{item.done}}" catchtap="onToggleTodo">✓</view>
+      <view class="todo-main">
+        <view class="todo-title">{{item.title}}</view>
+        <view class="todo-date">{{item.createdAtText}} 创建</view>
+      </view>
+      <text class="todo-del" data-id="{{item.id}}" catchtap="onRemoveTodo">×</text>
+    </view>
+  </block>
+</view>
+
+<!-- 新建待办 -->
+<view class="mask" wx:if="{{todoSheet.show}}" bindtap="closeTodoSheet"></view>
+<view class="sheet" wx:if="{{todoSheet.show}}" catchtap="stopBubble">
+  <view class="sheet-title">新建待办</view>
+  <view class="field">
+    <input class="field-input" placeholder="要做什么？最多 30 字" maxlength="30" value="{{todoSheet.title}}" data-field="title" bindinput="onTodoInput" />
+  </view>
+  <view class="field">
+    <input class="field-input" placeholder="备注（可选）" maxlength="200" value="{{todoSheet.note}}" data-field="note" bindinput="onTodoInput" />
+  </view>
+  <view class="field field-row">
+    <text class="field-label">截止日期</text>
+    <picker mode="date" value="{{todoSheet.dueDate}}" bindchange="onTodoDate">
+      <view class="picker-value">{{todoSheet.dueDate || '不设置'}}</view>
+    </picker>
+  </view>
+  <view class="field field-row">
+    <text class="field-label">优先级</text>
+    <view class="prios">
+      <view
+        wx:for="{{priorities}}"
+        wx:key="key"
+        class="chip {{todoSheet.priority === item.key ? 'chip-on' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onTodoPriority"
+      >{{item.label}}</view>
+    </view>
+  </view>
+  <view class="sheet-actions">
+    <button class="btn-plain" bindtap="closeTodoSheet">取消</button>
+    <button class="btn-primary" loading="{{todoSheet.saving}}" bindtap="onSaveTodo">保存</button>
+  </view>
+</view>
+
+<!-- 通知设置 -->
+<view class="mask" wx:if="{{prefsSheet.show}}" bindtap="closePrefs"></view>
+<view class="sheet" wx:if="{{prefsSheet.show}}" catchtap="stopBubble">
+  <view class="sheet-title">通知设置</view>
+  <view class="sheet-tip">关闭后将不再收到该类站内通知（历史记录保留），系统公告不可关闭。</view>
+  <view wx:for="{{prefsSheet.list}}" wx:key="key" class="pref-row">
+    <text>{{item.label}}</text>
+    <switch checked="{{item.on}}" color="#2B5B84" data-key="{{item.key}}" bindchange="onPrefChange" />
+  </view>
+  <view class="sheet-actions">
+    <button class="btn-plain" bindtap="closePrefs">取消</button>
+    <button class="btn-primary" bindtap="onSavePrefs">保存</button>
+  </view>
+</view>

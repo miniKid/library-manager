@@ -9,6 +9,8 @@ const { run } = require('./helpers');
 
 require('./cases/business');
 require('./cases/static');
+require('./cases/phase2');
+require('./cases/analytics-range');
 
 run().catch((e) => {
   console.error('测试运行器异常：', e);

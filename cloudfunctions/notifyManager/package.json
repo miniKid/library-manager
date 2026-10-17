@@ -1,0 +1,9 @@
+{
+  "name": "notifyManager",
+  "version": "1.0.0",
+  "description": "站内通知与待办：列表/已读/偏好、待办增删改、管理员群发",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

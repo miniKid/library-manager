@@ -4,6 +4,9 @@
     "pages/book-detail/index",
     "pages/my/index",
     "pages/my/borrows/index",
+    "pages/message/index",
+    "pages/book-reviews/index",
+    "pages/recommend/index",
     "pages/login/index",
     "pages/admin/index",
     "pages/admin/books/index",
@@ -12,7 +15,10 @@
     "pages/admin/book-borrows/index",
     "pages/admin/members/index",
     "pages/admin/settings/index",
-    "pages/admin/schedule/index"
+    "pages/admin/schedule/index",
+    "pages/admin/analytics/index",
+    "pages/admin/notify/index",
+    "pages/admin/reviews/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#2B5B84",

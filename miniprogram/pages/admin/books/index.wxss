@@ -74,3 +74,7 @@
 .act-edit { background: #E8F1F8; color: #2B5B84; }
 .act-del { background: #FDEBEA; color: #E54D42; }
 .act-del:last-child { margin-bottom: 0; }
+
+/* 触底加载提示 */
+.load-more { text-align: center; padding: 24rpx 0; }
+.lm-tip { font-size: 24rpx; color: #999; }

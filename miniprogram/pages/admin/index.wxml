@@ -75,6 +75,30 @@
         </view>
         <view class="menu-arrow">›</view>
       </view>
+      <view class="menu-item" bindtap="goAnalytics">
+        <view class="menu-icon" style="background:#EAF3FF;">📊</view>
+        <view class="menu-body">
+          <view class="menu-title">数据统计</view>
+          <view class="menu-sub">用户/书籍报表与 CSV 导出</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goNotify">
+        <view class="menu-icon" style="background:#FFF0F0;">📢</view>
+        <view class="menu-body">
+          <view class="menu-title">发送通知</view>
+          <view class="menu-sub">向全部或指定馆藏用户推送公告</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-item" bindtap="goReviews">
+        <view class="menu-icon" style="background:#F3F0FF;">📝</view>
+        <view class="menu-body">
+          <view class="menu-title">书评管理</view>
+          <view class="menu-sub">审核、回复、隐藏或删除书评</view>
+        </view>
+        <view class="menu-arrow">›</view>
+      </view>
     </view>
   </block>
 </view>

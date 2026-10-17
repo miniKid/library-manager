@@ -21,12 +21,16 @@ const BORROW_STATUS = {
 const ROLE = { ADMIN: 'admin', USER: 'user' };
 
 // 订阅消息模板 ID（与公众平台「订阅消息」中创建的一致，均为一次性订阅）
+// 允许用云函数环境变量覆盖：换模板时不必改代码、重新部署，控制台改配置即可
 const TMPL = {
-  BORROW_OK: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4',     // 借阅成功通知
-  RETURN_REMIND: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM'  // 图书到期提醒
+  BORROW_OK: process.env.TMPL_BORROW_OK || 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4', // 借阅成功通知
+  RETURN_REMIND: process.env.TMPL_RETURN_REMIND || 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
+  OVERDUE_REMIND: process.env.TMPL_OVERDUE_REMIND || 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo' // 逾期提醒（管理员手动触发）
 };
-// 跳转版本：开发工具内调试用 'developer'，正式发布后改为 'formal'
-const MP_STATE = 'developer';
+// 订阅消息点击后的跳转版本：默认 'formal'（正式版）；
+// 开发/体验阶段在云函数环境变量里配 MP_STATE=developer / trial，不要写死在代码里，
+// 否则上线后用户点消息会提示「小程序不存在」。
+const MP_STATE = process.env.MP_STATE || 'formal';
 
 /** 汇总各地点馆藏总数 */
 function sumStocks(stocks) {
@@ -369,7 +373,7 @@ async function doBorrow(event, openid) {
     data: {
       bookId,
       bookTitle: book.title,
-      bookCover: book.cover || '',
+      // 不写 bookCover：每条借阅记录复制一份 base64 封面既撑大响应体也没有消费方
       location,
       userId: openid,
       userName: (profile && profile.nickname) || '微信用户',
@@ -428,6 +432,15 @@ async function doConfirmBorrow(event) {
   // 确认借出成功后，向借书用户推送「借阅成功通知」（一次性订阅，用户已在借阅时授权）
   const rec = (await db.collection('borrows').doc(borrowId).get()).data;
   await sendBorrowOk(rec);
+  // 同时写一条站内通知，保证未授权订阅的用户也能在小程序内看到
+  await pushNotice(
+    rec.userId,
+    'borrow',
+    '借阅成功',
+    `《${rec.bookTitle || '图书'}》已借出，应还日期 ${cstDateStr(rec.dueDate)}`,
+    '/pages/my/borrows/index',
+    'info'
+  );
   return { ok: true };
 }
 
@@ -569,6 +582,81 @@ async function sendBorrowOk(record) {
   }
 }
 
+/** 写站内通知（notifications 集合仅云函数可写）；失败不影响主流程
+ *  通知偏好（users.notifyPrefs）里把该类关掉的用户不再收到，与消息中心的开关保持一致 */
+async function pushNotice(toOpenid, type, title, content, link, level) {
+  if (!toOpenid) return;
+  try {
+    const uRes = await db.collection('users').where({ openid: toOpenid }).field({ notifyPrefs: true }).get();
+    const prefs = (uRes.data[0] || {}).notifyPrefs || {};
+    if (prefs[type] === false) return;
+    await db.collection('notifications').add({
+      data: {
+        toOpenid,
+        type,
+        title,
+        content: content || '',
+        link: link || '',
+        level: level || 'info',
+        read: false,
+        readAt: null,
+        senderOpenid: 'system',
+        senderName: '图书馆',
+        createdAt: db.serverDate()
+      }
+    });
+  } catch (e) {
+    console.error('[borrowManager] 站内通知写入失败', type, toOpenid, (e && e.errCode) || e);
+  }
+}
+
+/** 管理员手动发送「逾期提醒」给借阅人（新模板 OVERDUE_REMIND，需借阅人此前已授权，可多次授权累加次数）
+ *  thing1=书籍名称，short_thing4=逾期天数，thing5=固定文案「你借出书籍已逾期，请尽快提交还书订单」
+ *  失败 43101 表示用户未订阅/次数用尽，返回明确提示由前端转达。
+ */
+async function doSendOverdueRemind(event = {}) {
+  const borrowId = event.borrowId;
+  if (!borrowId) return { ok: false, msg: '缺少借阅记录 ID' };
+  const rec = await db.collection('borrows').doc(borrowId).get();
+  const record = rec && rec.data;
+  if (!record) return { ok: false, msg: '借阅记录不存在' };
+  if (!record.userId) return { ok: false, msg: '该记录缺少借阅人信息' };
+  const due = new Date(record.dueDate);
+  const days = Math.max(0, Math.ceil((Date.now() - due.getTime()) / 86400000));
+  // 无论订阅消息是否成功，先写一条站内通知（订阅额度可能已用完）
+  await pushNotice(
+    record.userId,
+    'overdue',
+    `《${record.bookTitle || '图书'}》已逾期 ${days} 天`,
+    '请尽快提交还书申请，逾期会影响信用',
+    '/pages/my/borrows/index',
+    'danger'
+  );
+  try {
+    await cloud.openapi.subscribeMessage.send({
+      touser: record.userId,
+      templateId: TMPL.OVERDUE_REMIND,
+      page: 'pages/my/index',            // 点击消息进入「我的」页
+      miniprogram_state: MP_STATE,
+      lang: 'zh_CN',
+      // 字段名需与模板关键词一致（thing1/short_thing4/thing5），否则报 47003
+      data: {
+        thing1: { value: String(record.bookTitle || '图书').slice(0, 20) },
+        short_thing4: { value: String(days) },
+        thing5: { value: '你借出书籍已逾期，请尽快提交还书订单' }
+      }
+    });
+    return { ok: true };
+  } catch (e) {
+    const code = e && e.errCode;
+    const msg = (e && e.errMsg) || '';
+    if (code === 43101 || /43101/.test(msg)) {
+      return { ok: false, code: 'NO_GRANT', msg: '该用户未订阅或订阅次数已用完' };
+    }
+    return { ok: false, msg: '发送失败：' + (msg || code || '未知错误') };
+  }
+}
+
 /** 我的借阅：按当前用户 openid 查询（借出中且已过应还日期派生为已逾期） */
 async function doMyBorrows(openid) {
   if (!openid) return [];
@@ -577,6 +665,8 @@ async function doMyBorrows(openid) {
     .where({ userId: openid })
     .orderBy('borrowDate', 'desc')
     .limit(100)
+    // 不回传 bookCover：历史记录里存过 base64 封面副本，纯冗余且撑大响应体
+    .field({ bookCover: false })
     .get();
   return res.data.map((r) => {
     const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
@@ -591,6 +681,67 @@ async function doMyBorrows(openid) {
       scheduledReturnDateText: r.scheduledReturnDate || ''
     };
   });
+}
+
+/** 借阅记录的对外形态：派生逾期状态 + 页面直接可用的文案；不回传 bookCover（历史冗余字段） */
+function decorateBorrow(r) {
+  // 注意：逾期是派生值，不落库；BORROW_STATUS 里没有 OVERDUE 键，必须用字面量
+  const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
+  const out = {
+    ...r,
+    status: overdue ? 'overdue' : r.status,
+    borrowDateText: formatDate(r.borrowDate),
+    deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
+    dueDateText: formatCST(r.dueDate),
+    returnDateText: r.returnDate ? formatDate(r.returnDate) : '',
+    scheduledPickupDateText: r.scheduledPickupDate || '',
+    scheduledReturnDateText: r.scheduledReturnDate || ''
+  };
+  delete out.bookCover;
+  return out;
+}
+
+/**
+ * 管理端借阅列表（原客户端直读 borrows，已收回云函数：该集合不再对外开放读权限）
+ * @param {string} status '' | pending | borrowing | return_requested | returned | cancelled | overdue
+ */
+async function doAdminBorrows(event = {}) {
+  const status = String(event.status || '');
+  const where = {};
+  if (status) {
+    // 逾期是派生状态：库里 status 仍是 borrowing，先按 borrowing 查再按应还日期过滤
+    where.status = status === 'overdue' ? BORROW_STATUS.BORROWING : status;
+  }
+  const size = Math.min(Math.max(parseInt(event.limit, 10) || 100, 1), 100);
+  const res = await db
+    .collection('borrows')
+    .where(where)
+    .orderBy('borrowDate', 'desc')
+    .limit(size)
+    .field({ bookCover: false })
+    .get();
+  let list = res.data;
+  if (status === 'overdue') {
+    list = list.filter(
+      (r) => r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr()
+    );
+  }
+  return { ok: true, data: list.map(decorateBorrow) };
+}
+
+/** 某本书的全部借阅记录（管理端图书详情 → 借阅记录页），同样走云函数 */
+async function doBookBorrows(event = {}) {
+  const bookId = String(event.bookId || '');
+  if (!bookId) return { ok: false, msg: '参数错误' };
+  const size = Math.min(Math.max(parseInt(event.limit, 10) || 100, 1), 100);
+  const res = await db
+    .collection('borrows')
+    .where({ bookId })
+    .orderBy('borrowDate', 'desc')
+    .limit(size)
+    .field({ bookCover: false })
+    .get();
+  return { ok: true, data: res.data.map(decorateBorrow) };
 }
 
 /** 统计概览（管理端）
@@ -629,6 +780,44 @@ async function doGetStats() {
       pendingTotal: pending.total + returnRequested.total,
       memberTotal: users.total,
       borrowTotal: allBorrows.total
+    }
+  };
+}
+
+/** 借阅管理筛选栏计数（管理端）
+ *  与 doGetStats 同口径，但拆到每个状态，供页签徽标使用：
+ *  - borrowing 为 DB 原始借出中总数（含已逾期，逾期是其派生标签）
+ *  - overdue 单独返回，便于页面把「逾期」标红
+ */
+async function doGetBorrowCounts() {
+  const [all, pending, borrowing, returnRequested, returned, cancelled, borrowingList] = await Promise.all([
+    db.collection('borrows').count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.PENDING }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.BORROWING }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.RETURN_REQUESTED }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.RETURNED }).count(),
+    db.collection('borrows').where({ status: BORROW_STATUS.CANCELLED }).count(),
+    db
+      .collection('borrows')
+      .where({ status: BORROW_STATUS.BORROWING })
+      .field({ dueDate: true })
+      .limit(1000)
+      .get()
+  ]);
+  let overdue = 0;
+  for (const r of borrowingList.data) {
+    if (r.dueDate && cstDateStr(r.dueDate) < cstTodayStr()) overdue++;
+  }
+  return {
+    ok: true,
+    data: {
+      all: all.total,
+      pending: pending.total,
+      borrowing: borrowing.total,
+      return_requested: returnRequested.total,
+      overdue,
+      returned: returned.total,
+      cancelled: cancelled.total
     }
   };
 }
@@ -712,6 +901,17 @@ async function doAuditCard(event, pass) {
     })
   };
   await db.collection('users').doc(userId).update({ data: patch });
+  // 审批结果通知（站内 + 用户打开「我的」即可看到原因）
+  await pushNotice(
+    u.openid,
+    'card',
+    pass ? '借书证已开通' : '借书证申请被驳回',
+    pass
+      ? `归属馆藏：${(u.card && u.card.location) || '未设置'}，现在可以借阅该馆藏的图书了`
+      : `原因：${patch.card.rejectReason}，可修改资料后重新申请`,
+    '/pages/my/index',
+    pass ? 'info' : 'warning'
+  );
   return { ok: true };
 }
 
@@ -777,9 +977,22 @@ async function doDemoteAdmin(event) {
 }
 
 /** 用户列表（管理员） */
-async function doGetUsers() {
-  const r = await db.collection('users').orderBy('createdAt', 'desc').limit(100).get();
-  return { ok: true, data: { list: r.data } };
+async function doGetUsers(event = {}) {
+  const { keyword = '', role = '', cardStatus = '', page = 1, pageSize = 20 } = event;
+  const where = {};
+  if (role) where.role = role;
+  if (cardStatus) where['card.status'] = cardStatus;
+  if (keyword) {
+    // 转义正则特殊字符，避免用户输入 ()[] 等导致正则报错
+    const escaped = String(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    where.nickname = db.RegExp({ regexp: escaped, options: 'i' });
+  }
+  const size = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 100);
+  const p = Math.max(parseInt(page, 10) || 1, 1);
+  const coll = db.collection('users').field({ avatarUrl: false }).where(where);
+  const countRes = await coll.count();
+  const r = await coll.orderBy('createdAt', 'desc').skip((p - 1) * size).limit(size).get();
+  return { ok: true, data: { list: r.data, total: countRes.total } };
 }
 
 /** 借阅人续借：逾期前自主申请，延长应还日期（按馆藏设置续借次数与天数） */
@@ -854,10 +1067,20 @@ exports.main = async (event) => {
         return await doDeleteBook(event);
       case 'stats':
         return await doGetStats();
+      // ---- 借阅查询（管理端）：borrows 集合已关闭客户端读权限，只能经这里查 ----
+      case 'adminBorrows':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doAdminBorrows(event);
+      case 'bookBorrows':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doBookBorrows(event);
+      case 'borrowCounts':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doGetBorrowCounts();
       // ---- 用户 / 借书证管理 ----
       case 'users':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
-        return await doGetUsers();
+        return await doGetUsers(event);
       case 'applyCard':
         return await doApplyCard(event, OPENID);
       case 'updateCardLocation':
@@ -877,6 +1100,10 @@ exports.main = async (event) => {
       case 'demoteAdmin':
         if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
         return await doDemoteAdmin(event);
+      // 管理员手动发送「逾期提醒」（新模板，需用户此前已授权）
+      case 'sendOverdueRemind':
+        if (!(await isAdmin(OPENID))) return { ok: false, msg: '无权限执行此操作' };
+        return await doSendOverdueRemind(event);
       default:
         return { ok: false, msg: '未知操作' };
     }

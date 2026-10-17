@@ -6,12 +6,18 @@ Page({
   data: {
     books: [],
     keyword: '',
-    loading: false
+    // 分页策略：首次加载 pageSize 本，触底（onReachBottom）再加载下一页，避免图书量大时一次性加载过慢
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    loading: false,
+    finished: false,
+    loadError: false
   },
   timer: null,
 
   onShow() {
-    this.loadBooks();
+    this.loadBooks(true);
   },
 
   onKeywordInput(e) {
@@ -22,21 +28,23 @@ Page({
 
   onSearch() {
     if (this.timer) clearTimeout(this.timer);
-    this.loadBooks();
+    this.loadBooks(true);
   },
 
   onClearKeyword() {
     this.setData({ keyword: '' });
-    this.loadBooks();
+    this.loadBooks(true);
   },
 
-  async loadBooks() {
-    this.setData({ loading: true });
+  async loadBooks(reset) {
+    if (this.data.loading) return;
+    const page = reset ? 1 : this.data.page;
+    this.setData({ loading: true, loadError: false });
     try {
-      const { list } = await services.getBooks({
+      const { list, total } = await services.getBooks({
         keyword: this.data.keyword.trim(),
-        page: 1,
-        pageSize: 100
+        page,
+        pageSize: this.data.pageSize
       });
       const normalized = await normalizeList(list);
       const mapped = normalized.map((b) => ({
@@ -49,16 +57,33 @@ Page({
           num: Number(b.stocks[loc]) || 0
         }))
       }));
-      this.setData({ books: mapped, loading: false });
+      this.setData({
+        books: reset ? mapped : this.data.books.concat(mapped),
+        page: page + 1,
+        total,
+        finished: page * this.data.pageSize >= total,
+        loading: false
+      });
     } catch (e) {
       console.error('[admin/books] loadBooks error:', e);
-      this.setData({ loading: false, loadError: true });
+      if (reset) {
+        this.setData({ loading: false, loadError: true });
+      } else {
+        this.setData({ loading: false });
+        wx.showToast({ title: '加载失败', icon: 'none' });
+      }
+    }
+  },
+
+  onReachBottom() {
+    if (!this.data.finished && !this.data.loading) {
+      this.loadBooks(false);
     }
   },
 
   onRetry() {
     this.setData({ loadError: false });
-    this.loadBooks();
+    this.loadBooks(true);
   },
 
   goEdit(e) {
@@ -82,7 +107,7 @@ Page({
         const result = await services.deleteBook(id);
         if (result && result.ok) {
           wx.showToast({ title: '已删除', icon: 'success' });
-          this.loadBooks();
+          this.loadBooks(true);
         } else {
           wx.showToast({ title: (result && result.msg) || '删除失败', icon: 'none' });
         }

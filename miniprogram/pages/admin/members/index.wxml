@@ -1,4 +1,18 @@
 <view class="page safe-bottom">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <text class="search-icon">🔍</text>
+    <input
+      class="search-input"
+      placeholder="搜索昵称"
+      value="{{keyword}}"
+      confirm-type="search"
+      bindinput="onKeywordInput"
+      bindconfirm="onSearch"
+    />
+    <text wx:if="{{keyword}}" class="search-clear" bindtap="onClearKeyword">✕</text>
+  </view>
+
   <!-- 筛选 -->
   <view class="filters">
     <view
@@ -10,7 +24,7 @@
     >{{item.label}}</view>
   </view>
 
-  <view wx:if="{{loading}}" class="card">
+  <view wx:if="{{loading && filtered.length === 0}}" class="card">
     <view class="empty">
       <view class="empty-icon">⏳</view>
       <view>加载中…</view>
@@ -20,24 +34,19 @@
   <view wx:elif="{{filtered.length === 0}}" class="card">
     <view class="empty">
       <view class="empty-icon">👥</view>
-      <view>{{users.length === 0 ? '暂无注册用户' : '当前筛选无匹配用户'}}</view>
+      <view>{{users.length === 0 ? '暂无注册用户' : (keyword ? '未找到匹配「' + keyword + '」的用户' : '当前筛选无匹配用户')}}</view>
     </view>
   </view>
 
   <view wx:else>
   <view wx:for="{{filtered}}" wx:key="_id" class="card user-item">
     <view class="user-row">
-      <view class="avatar">
-        <image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" class="avatar-img" />
-        <text wx:else class="avatar-text">{{item.coverChar}}</text>
-      </view>
       <view class="user-info">
         <view class="user-name ellipsis">
           {{item.nickname}}
           <view class="tag {{item.isAdmin ? 'tag-orange' : 'tag-blue'}}" style="margin-left: 12rpx;">{{item.isAdmin ? '管理员' : '读者'}}</view>
           <view wx:if="{{item.isSelf}}" class="tag tag-green" style="margin-left: 12rpx;">当前</view>
         </view>
-        <view class="user-id">ID: {{item.openid}}</view>
       </view>
     </view>
 
@@ -64,5 +73,7 @@
       <view wx:if="{{!item.isSelf && item.cardStatus === 'active'}}" class="mini-btn mini-btn-danger" data-id="{{item._id}}" data-nickname="{{item.nickname}}" bindtap="onRemoveCard">移除借书证</view>
     </view>
   </view>
+    <view wx:if="{{loading}}" class="list-more">加载中…</view>
+    <view wx:elif="{{finished}}" class="list-more list-more-end">— 没有更多了 —</view>
   </view>
 </view>
