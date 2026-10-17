@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "全部书评"
+  "navigationBarTitleText": "全部书评",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

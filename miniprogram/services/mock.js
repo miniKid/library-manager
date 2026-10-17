@@ -317,7 +317,7 @@ async function applyCard({ phone, location } = {}, profile) {
 
 /** 管理员：通过某用户的借书证申请 */
 async function approveCard(userId) {
-  const db = getDb();
+  const db = ensureCollections(getDb());
   const user = db.users.find((u) => u._id === userId);
   if (!user) return { ok: false, msg: '用户不存在' };
   // 管理员亦须遵循借书证规则，其申请同样可被审批
@@ -327,13 +327,23 @@ async function approveCard(userId) {
   user.card.status = CARD_STATUS.ACTIVE;
   user.card.auditDate = Date.now();
   user.card.rejectReason = '';
+  // 与云端 borrowManager 保持一致：审批结果同步写一条站内通知
+  pushMockNotice(
+    db,
+    user.openid,
+    'card',
+    '借书证已开通',
+    `你的借书证已开通（归属馆藏：${user.card.location || '—'}），现在可以借书了。`,
+    '/pages/my/index',
+    'success'
+  );
   saveDb(db);
   return { ok: true };
 }
 
 /** 管理员：驳回某用户的借书证申请 */
 async function rejectCard(userId, reason) {
-  const db = getDb();
+  const db = ensureCollections(getDb());
   const user = db.users.find((u) => u._id === userId);
   if (!user) return { ok: false, msg: '用户不存在' };
   if (!user.card || user.card.status !== CARD_STATUS.PENDING) {
@@ -342,6 +352,15 @@ async function rejectCard(userId, reason) {
   user.card.status = CARD_STATUS.REJECTED;
   user.card.auditDate = Date.now();
   user.card.rejectReason = (reason && String(reason).trim()) || '资料不符合要求';
+  pushMockNotice(
+    db,
+    user.openid,
+    'card',
+    '借书证申请被驳回',
+    `驳回原因：${user.card.rejectReason}。补全资料后可重新申请。`,
+    '/pages/my/index',
+    'warning'
+  );
   saveDb(db);
   return { ok: true };
 }
@@ -617,7 +636,7 @@ function setSubscribedReturn(borrowId, value) {
 
 /** 管理员确认借出：扣减对应地点库存并生成应还日期 */
 async function confirmBorrow(borrowId) {
-  const db = getDb();
+  const db = ensureCollections(getDb());
   const record = db.borrows.find((r) => r._id === borrowId);
   if (!record) return { ok: false, msg: '借阅记录不存在' };
   if (record.status !== BORROW_STATUS.PENDING) return { ok: false, msg: '该申请已被处理，请刷新后重试' };
@@ -635,6 +654,16 @@ async function confirmBorrow(borrowId) {
   book.stock = left;
   book.status = left > 0 ? 'available' : 'borrowed';
   book.borrowCount = (book.borrowCount || 0) + 1;
+  // 与云端一致：确认借出后写一条「借阅成功」站内通知
+  pushMockNotice(
+    db,
+    record.userId,
+    'borrow',
+    '借阅成功',
+    `《${record.bookTitle || book.title}》已借出，请于 ${formatDate(record.dueDate)} 前归还。`,
+    '/pages/my/borrows/index',
+    'success'
+  );
   saveDb(db);
   return { ok: true };
 }
@@ -905,7 +934,24 @@ async function getStats() {
 }
 
 /** 管理员手动发送「逾期提醒」（模拟模式无真实订阅，直接返回成功） */
-async function sendOverdueRemind() {
+async function sendOverdueRemind(borrowId) {
+  const db = ensureCollections(getDb());
+  const record = db.borrows.find((r) => r._id === borrowId);
+  if (!record) return { ok: false, msg: '借阅记录不存在' };
+  if (!record.userId) return { ok: false, msg: '该记录缺少借阅人信息' };
+  const days = Math.max(0, Math.ceil((Date.now() - new Date(record.dueDate).getTime()) / 86400000));
+  // 模拟层没有订阅消息，只写站内通知（云端两者都发）
+  pushMockNotice(
+    db,
+    record.userId,
+    'overdue',
+    `《${record.bookTitle || '图书'}》已逾期 ${days} 天`,
+    '请尽快提交还书申请，逾期会影响信用',
+    '/pages/my/borrows/index',
+    'danger'
+  );
+  record.reminded = true;
+  saveDb(db);
   return { ok: true };
 }
 
@@ -921,6 +967,28 @@ function ensureCollections(db) {
     if (!Array.isArray(db[k])) db[k] = [];
   });
   return db;
+}
+
+/** 写站内通知：等价于云函数的 pushNotice，同样遵守 users.notifyPrefs 开关 */
+function pushMockNotice(db, toOpenid, type, title, content, link, level) {
+  if (!toOpenid) return;
+  const u = (db.users || []).find((x) => x.openid === toOpenid);
+  const prefs = (u && u.notifyPrefs) || {};
+  if (prefs[type] === false) return;
+  db.notifications.push({
+    _id: genId('nt'),
+    toOpenid,
+    type,
+    title,
+    content: content || '',
+    link: link || '',
+    level: level || 'info',
+    read: false,
+    readAt: null,
+    senderOpenid: 'system',
+    senderName: '图书馆',
+    createdAt: Date.now()
+  });
 }
 
 function meUser(db) {

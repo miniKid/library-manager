@@ -579,10 +579,14 @@ async function sendBorrowOk(record) {
   }
 }
 
-/** 写站内通知（notifications 集合仅云函数可写）；失败不影响主流程 */
+/** 写站内通知（notifications 集合仅云函数可写）；失败不影响主流程
+ *  通知偏好（users.notifyPrefs）里把该类关掉的用户不再收到，与消息中心的开关保持一致 */
 async function pushNotice(toOpenid, type, title, content, link, level) {
   if (!toOpenid) return;
   try {
+    const uRes = await db.collection('users').where({ openid: toOpenid }).field({ notifyPrefs: true }).get();
+    const prefs = (uRes.data[0] || {}).notifyPrefs || {};
+    if (prefs[type] === false) return;
     await db.collection('notifications').add({
       data: {
         toOpenid,

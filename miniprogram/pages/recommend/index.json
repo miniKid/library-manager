@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "为你推荐"
+  "navigationBarTitleText": "为你推荐",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }
