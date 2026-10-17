@@ -55,6 +55,157 @@ function dayList(days) {
   return out;
 }
 
+/* ------------------------- 统计区间（预设 / 自定义） ------------------------- */
+// 与 miniprogram/utils/analytics-range.js 保持同一口径，改动需同步两边
+
+const DAY_MS = 86400000;
+const CHINA_OFFSET_MS = 8 * 3600 * 1000;
+const MAX_SPAN_DAYS = 731; // 两年（含闰年）
+
+/** 'YYYY-MM-DD' → 东八区当天 00:00 的时间戳；非法返回 null */
+function dayStartMs(dateStr) {
+  const s = String(dateStr || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const ms = Date.parse(s + 'T00:00:00+08:00');
+  return isNaN(ms) ? null : ms;
+}
+
+/** 今天（东八区）00:00 */
+function todayStartMs() {
+  const t = new Date(Date.now() + CHINA_OFFSET_MS);
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - CHINA_OFFSET_MS;
+}
+
+/** 两年前的今天 00:00 */
+function minStartMs() {
+  const t = new Date(todayStartMs() + CHINA_OFFSET_MS);
+  t.setUTCFullYear(t.getUTCFullYear() - 2);
+  return t.getTime() - CHINA_OFFSET_MS;
+}
+
+function unitForDays(days) {
+  if (days <= 31) return 'day';
+  if (days <= 120) return 'week';
+  return 'month';
+}
+
+/**
+ * 解析统计区间：优先自定义 startDate/endDate，否则回退 days。
+ * 越界一律收敛（不报错）：结束日 ≤ 今天、开始日 ≥ 两年前、跨度 ≤ 731 天。
+ */
+function resolveRange(event = {}) {
+  const notices = [];
+  const today = todayStartMs();
+  const minStart = minStartMs();
+  const rawStart = dayStartMs(event.startDate);
+  const rawEnd = dayStartMs(event.endDate);
+  const isCustom = rawStart !== null && rawEnd !== null;
+
+  let startMs;
+  let endMs;
+
+  if (isCustom) {
+    startMs = rawStart;
+    endMs = rawEnd;
+    if (endMs > today) {
+      endMs = today;
+      notices.push('结束日期不能晚于今天，已自动改为今天');
+    }
+    if (startMs < minStart) {
+      startMs = minStart;
+      notices.push('开始日期不能早于两年前，已自动调整');
+    }
+    if (startMs > endMs) {
+      const tmp = startMs;
+      startMs = endMs;
+      endMs = tmp;
+      notices.push('开始日期晚于结束日期，已自动调换');
+    }
+    if (Math.round((endMs - startMs) / DAY_MS) + 1 > MAX_SPAN_DAYS) {
+      startMs = endMs - (MAX_SPAN_DAYS - 1) * DAY_MS;
+      notices.push(`区间最长 ${MAX_SPAN_DAYS} 天，已自动截断`);
+    }
+  } else {
+    const days = Math.min(365, Math.max(1, Number(event.days) || 30));
+    endMs = today;
+    startMs = today - (days - 1) * DAY_MS;
+  }
+
+  if (startMs < minStart) startMs = minStart;
+  if (endMs > today) endMs = today;
+
+  const days = Math.round((endMs - startMs) / DAY_MS) + 1;
+  const unit = unitForDays(days);
+  const startDate = formatCST(startMs, false);
+  const endDate = formatCST(endMs, false);
+
+  return {
+    mode: isCustom ? 'custom' : 'preset',
+    start: new Date(startMs),
+    endExclusive: new Date(endMs + DAY_MS),
+    startMs,
+    endExclusiveMs: endMs + DAY_MS,
+    startDate,
+    endDate,
+    days,
+    unit,
+    unitLabel: unit === 'month' ? '按月' : unit === 'week' ? '按周' : '按天',
+    label: isCustom ? `${startDate} 至 ${endDate}` : `近 ${days} 天`,
+    notices
+  };
+}
+
+/** 趋势分桶：按天 / 按周（7 天一格）/ 按月（自然月） */
+function buildBuckets(range) {
+  const out = [];
+  const end = range.endExclusiveMs;
+
+  if (range.unit === 'month') {
+    let cursor = range.startMs;
+    while (cursor < end) {
+      const t = new Date(cursor + CHINA_OFFSET_MS);
+      const y = t.getUTCFullYear();
+      const m = t.getUTCMonth();
+      const to = Math.min(Date.UTC(y, m + 1, 1) - CHINA_OFFSET_MS, end);
+      out.push({ label: `${y}-${m + 1 < 10 ? '0' : ''}${m + 1}`, from: cursor, to });
+      cursor = to;
+    }
+    return out;
+  }
+
+  const step = (range.unit === 'week' ? 7 : 1) * DAY_MS;
+  for (let s = range.startMs; s < end; s += step) {
+    out.push({ label: formatCST(s, false).slice(5), from: s, to: Math.min(s + step, end) });
+  }
+  return out;
+}
+
+function bucketIndexOf(ms, range, buckets) {
+  if (range.unit === 'month') {
+    const label = formatCST(ms, false).slice(0, 7);
+    for (let i = 0; i < buckets.length; i++) if (buckets[i].label === label) return i;
+    return -1;
+  }
+  const step = (range.unit === 'week' ? 7 : 1) * DAY_MS;
+  const idx = Math.floor((ms - range.startMs) / step);
+  return idx >= 0 && idx < buckets.length ? idx : -1;
+}
+
+/** 按区间分桶统计趋势 */
+function trendOf(items, range, pick) {
+  const buckets = buildBuckets(range);
+  const counts = new Array(buckets.length).fill(0);
+  (items || []).forEach((it) => {
+    const v = pick(it);
+    if (!v) return;
+    const ms = new Date(v).getTime();
+    if (isNaN(ms) || ms < range.startMs || ms >= range.endExclusiveMs) return;
+    const idx = bucketIndexOf(ms, range, buckets);
+    if (idx >= 0) counts[idx] += 1;
+  });
+  return buckets.map((b, i) => ({ label: b.label, value: counts[i] }));
+}
+
 function sumStocks(stocks) {
   if (!stocks) return 0;
   return Object.keys(stocks).reduce((s, k) => s + (Number(stocks[k]) || 0), 0);
@@ -211,12 +362,18 @@ async function doUserStats(event, openid) {
 
 async function doBookStats(event, openid) {
   if (!(await isAdmin(openid))) return { ok: false, msg: '无权限执行此操作' };
-  const days = Math.min(365, Math.max(1, Number(event.days) || 30));
-  const start = daysAgoStart(days);
+  // 支持两种口径：{ days } 预设近 N 天；{ startDate, endDate } 自定义区间（含首含尾）
+  const range = resolveRange(event);
+  const start = range.start;
+  const endEx = range.endExclusive;
+  const days = range.days;
 
   const [kinds, newBooks, bookRes, occupiedRes, reviewRes, settingsRes] = await Promise.all([
     db.collection('books').count(),
-    db.collection('books').where({ createdAt: _.gte(start) }).count(),
+    db
+      .collection('books')
+      .where({ createdAt: _.gte(start).and(_.lt(endEx)) })
+      .count(),
     db
       .collection('books')
       .field({
@@ -283,7 +440,7 @@ async function doBookStats(event, openid) {
   const hotAgg = await db
     .collection('borrows')
     .aggregate()
-    .match({ borrowDate: _.gte(start), status: _.neq('cancelled') })
+    .match({ borrowDate: _.gte(start).and(_.lt(endEx)), status: _.neq('cancelled') })
     .group({ _id: '$bookId', n: $.sum(1) })
     .sort({ n: -1 })
     .limit(20)
@@ -318,17 +475,23 @@ async function doBookStats(event, openid) {
   });
   const ratingChart = dist.map((n, i) => ({ label: i + 1 + ' 星', value: n }));
 
-  // 新增书籍趋势
-  const daysArr = dayList(days);
-  const trend = daysArr.map((d) => {
-    const n = books.filter((b) => b.createdAt && formatCST(b.createdAt) === d).length;
-    return { label: d.slice(5), value: n };
-  });
+  // 新增书籍趋势（区间内按天/周/月分桶，超过 31 天自动降精度）
+  const trend = trendOf(books, range, (b) => b.createdAt);
 
   return {
     ok: true,
     data: {
       days,
+      range: {
+        mode: range.mode,
+        days: range.days,
+        startDate: range.startDate,
+        endDate: range.endDate,
+        unit: range.unit,
+        unitLabel: range.unitLabel,
+        label: range.label,
+        notices: range.notices
+      },
       cards: {
         kinds: kinds.total,
         copies,

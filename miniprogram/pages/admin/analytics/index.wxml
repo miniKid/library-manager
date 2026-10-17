@@ -8,10 +8,38 @@
     <view
       wx:for="{{ranges}}"
       wx:key="days"
-      class="chip {{days === item.days ? 'chip-on' : ''}}"
+      class="chip {{rangeMode === 'preset' && days === item.days ? 'chip-on' : ''}}"
       data-days="{{item.days}}"
       bindtap="onRange"
     >{{item.label}}</view>
+    <view wx:if="{{tab === 'book'}}" class="chip {{rangeMode === 'custom' ? 'chip-on' : ''}}" bindtap="onCustomRange">自定义</view>
+  </view>
+
+  <!-- 书籍统计：自定义起止日期 -->
+  <view wx:if="{{tab === 'book'}}" class="range-panel">
+    <view class="range-panel-head">
+      <text class="range-panel-title">统计区间</text>
+      <text class="range-panel-now">{{bookRangeText}}</text>
+    </view>
+    <view wx:if="{{rangeMode === 'custom'}}" class="range-pickers">
+      <picker mode="date" value="{{startDate}}" start="{{minDate}}" end="{{today}}" bindchange="onStartDate">
+        <view class="range-field">
+          <text class="range-field-label">开始</text>
+          <text class="range-field-value">{{startDate}}</text>
+        </view>
+      </picker>
+      <text class="range-sep">至</text>
+      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{today}}" bindchange="onEndDate">
+        <view class="range-field">
+          <text class="range-field-label">结束</text>
+          <text class="range-field-value">{{endDate}}</text>
+        </view>
+      </picker>
+      <text class="range-reset" bindtap="onResetRange">重置</text>
+    </view>
+    <view wx:if="{{rangeMode === 'custom'}}" class="range-tip">
+      最早可选 {{minDate}}（两年前），最晚只能到 {{today}}；超过 31 天趋势图自动按周汇总，超过 120 天按月汇总
+    </view>
   </view>
 
   <view wx:if="{{error}}" class="empty">
@@ -114,7 +142,7 @@
       </view>
       <view class="stat-card">
         <view class="stat-num">{{book.cards.newBooks}}</view>
-        <view class="stat-label">近{{days}}天新增</view>
+        <view class="stat-label">{{bookNewLabel}}</view>
       </view>
     </view>
 
@@ -143,6 +171,20 @@
         <view class="bar-track"><view class="bar-fill bar-fill-3" style="width: {{item.percent}}%"></view></view>
         <text class="bar-num">{{item.value}}</text>
       </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">新增书籍趋势（{{bookUnitLabel}}）</view>
+      <view wx:if="{{bookBars.trend.length}}" class="vchart">
+        <view wx:for="{{bookBars.trend}}" wx:key="label" class="vbar-wrap">
+          <view class="vbar" style="height: {{item.percent}}%"></view>
+        </view>
+      </view>
+      <view wx:if="{{bookBars.trend.length}}" class="vaxis">
+        <text>{{bookBars.trend[0].label}}</text>
+        <text wx:if="{{bookBars.trend.length > 1}}">{{bookBars.trend[bookBars.trend.length - 1].label}}</text>
+      </view>
+      <view wx:if="{{!bookBars.trend.length}}" class="chart-empty">该区间没有新增书籍</view>
     </view>
 
     <view class="card">

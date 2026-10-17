@@ -69,3 +69,30 @@
 .loading { text-align: center; color: var(--c-text-3); font-size: 26rpx; padding: 60rpx 0; }
 .export-bar { padding: 10rpx 0 40rpx; }
 .export-tip { text-align: center; font-size: 22rpx; color: var(--c-text-3); margin-top: 14rpx; line-height: 1.5; }
+
+/* ===== 统计区间（自定义起止日期） ===== */
+.ranges { flex-wrap: wrap; }
+.range-panel {
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-card);
+}
+.range-panel-head { display: flex; align-items: center; justify-content: space-between; }
+.range-panel-title { font-size: 24rpx; color: var(--c-text-3); }
+.range-panel-now { font-size: 24rpx; color: var(--c-primary-2); font-weight: 500; }
+.range-pickers { display: flex; align-items: center; margin-top: 16rpx; }
+.range-field {
+  display: flex;
+  align-items: center;
+  background: #F7F8FA;
+  border-radius: var(--r-sm);
+  padding: 12rpx 16rpx;
+}
+.range-field-label { font-size: 22rpx; color: var(--c-text-3); margin-right: 8rpx; }
+.range-field-value { font-size: 26rpx; color: var(--c-text); }
+.range-sep { font-size: 24rpx; color: var(--c-text-3); margin: 0 12rpx; }
+.range-reset { font-size: 22rpx; color: var(--c-primary-2); margin-left: auto; padding: 8rpx 4rpx; }
+.range-tip { font-size: 21rpx; color: var(--c-text-3); line-height: 1.6; margin-top: 12rpx; }
+.range-pickers picker { flex: 0 0 auto; }

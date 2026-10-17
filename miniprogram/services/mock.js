@@ -16,6 +16,7 @@ const {
   DEFAULT_RENEW_DAYS
 } = require('../utils/constants');
 const { formatDate, addDays, genId, formatCST, cstDateStr, cstTodayStr } = require('../utils/util');
+const rangeUtil = require('../utils/analytics-range');
 
 const DB_KEY = '__mock_db';
 const MOCK_OPENID = 'mock_openid_001';
@@ -1540,14 +1541,18 @@ async function getUserStats(days) {
   };
 }
 
-async function getBookStats(days) {
+async function getBookStats(input) {
   const db = ensureCollections(getDb());
   if (!isAdminMe(db)) return { error: '无权限' };
-  const d = days || 30;
-  const start = daysAgo(d);
+  const range = rangeUtil.normalizeRange(input);
+  const start = range.startMs;
+  const endEx = range.endExclusiveMs;
   const books = db.books || [];
   const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
-  const inRange = borrows.filter((r) => new Date(r.borrowDate).getTime() >= start);
+  const inRange = borrows.filter((r) => {
+    const t = new Date(r.borrowDate).getTime();
+    return t >= start && t < endEx;
+  });
 
   const cat = {};
   let copies = 0;
@@ -1600,13 +1605,26 @@ async function getBookStats(days) {
   });
 
   return {
-    days: d,
+    days: range.days,
+    range: {
+      mode: range.mode,
+      days: range.days,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      unit: range.unit,
+      unitLabel: range.unitLabel,
+      label: range.label,
+      notices: range.notices || []
+    },
     cards: {
       kinds: books.length,
       copies,
       available,
       zeroStock,
-      newBooks: books.filter((b) => new Date(b.createdAt).getTime() >= start).length,
+      newBooks: books.filter((b) => {
+        const t = new Date(b.createdAt).getTime();
+        return t >= start && t < endEx;
+      }).length,
       coldCount: cold.length
     },
     byLocation,
@@ -1614,7 +1632,7 @@ async function getBookStats(days) {
     hotBooks,
     coldBooks: cold,
     ratingChart: dist.map((n, i) => ({ label: i + 1 + ' 星', value: n })),
-    trend: bucketTrend(books, d, (b) => b.createdAt)
+    trend: rangeUtil.trendOf(books, range, (b) => b.createdAt)
   };
 }
 

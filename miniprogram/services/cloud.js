@@ -659,8 +659,15 @@ async function getUserStats(days = 30) {
   return r.ok ? r.data : { error: r.msg || '统计失败' };
 }
 
-async function getBookStats(days = 30) {
-  const r = await invoke('insightManager', { action: 'bookStats', days });
+/** 书籍统计：传数字按「近 N 天」，传 { startDate, endDate } 按自定义区间（含首含尾） */
+async function getBookStats(input = 30) {
+  const payload = typeof input === 'number' ? { days: input } : input || { days: 30 };
+  const r = await invoke('insightManager', {
+    action: 'bookStats',
+    days: payload.days,
+    startDate: payload.startDate,
+    endDate: payload.endDate
+  });
   return r.ok ? r.data : { error: r.msg || '统计失败' };
 }
 
