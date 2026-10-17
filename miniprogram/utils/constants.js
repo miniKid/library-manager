@@ -52,5 +52,59 @@ module.exports = {
     BORROW_OK: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4',     // 借阅成功通知
     RETURN_REMIND: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM',  // 图书到期提醒（定时）
     OVERDUE_REMIND: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo'  // 逾期提醒（管理员手动触发）
-  }
+  },
+
+  // ===== 第二期：通知 / 待办 / 评论 / 推荐 =====
+
+  // 站内通知类型（与云函数 notifyManager / notify 保持一致）
+  NOTICE_TYPE: {
+    BORROW: 'borrow',   // 借阅成功 / 借出确认
+    DUE: 'due',         // 即将到期
+    OVERDUE: 'overdue', // 已逾期
+    CARD: 'card',       // 借书证审批结果
+    SYSTEM: 'system',   // 管理员群发公告
+    REVIEW: 'review'    // 书评被回复
+  },
+
+  // 通知类型展示配置：label 用于列表标签，switch 表示用户是否可关闭该类站内通知
+  NOTICE_META: {
+    borrow: { label: '借阅', color: 'tag-blue', switch: true },
+    due: { label: '到期', color: 'tag-orange', switch: true },
+    overdue: { label: '逾期', color: 'tag-red', switch: true },
+    card: { label: '借书证', color: 'tag-green', switch: true },
+    system: { label: '公告', color: 'tag-gray', switch: false },
+    review: { label: '书评', color: 'tag-blue', switch: true }
+  },
+
+  // 评论状态（先发后审：默认 approved，管理员可置为 hidden）
+  REVIEW_STATUS: {
+    APPROVED: 'approved',
+    HIDDEN: 'hidden'
+  },
+
+  REVIEW_MIN_LEN: 5,
+  REVIEW_MAX_LEN: 500,
+  REVIEW_PAGE_SIZE: 10,
+
+  // 待办优先级
+  TODO_PRIORITY: {
+    HIGH: 'high',
+    NORMAL: 'normal',
+    LOW: 'low'
+  },
+
+  // 单个用户未完成自定义待办上限
+  TODO_MAX_ACTIVE: 100,
+
+  // 通知保留天数 & 群发单次接收者上限
+  NOTICE_KEEP_DAYS: 90,
+  NOTICE_FANOUT_LIMIT: 500,
+
+  // 统计与导出：默认区间与单次导出行数上限
+  STATS_DEFAULT_DAYS: 30,
+  EXPORT_MAX_ROWS: 3000,
+
+  // 推荐：候选池上限、作者去重上限
+  RECOMMEND_POOL_SIZE: 200,
+  RECOMMEND_MAX_PER_AUTHOR: 2
 };

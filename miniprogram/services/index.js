@@ -4,6 +4,7 @@
  * 页面层无需关心底层是云开发还是本地模拟
  */
 const env = require('../config/env');
+const { exportCsv } = require('./export');
 const impl = env.useCloud ? require('./cloud') : require('./mock');
 
 /**
@@ -24,4 +25,4 @@ async function uploadAvatar(localPath) {
   return res.fileID;
 }
 
-module.exports = Object.assign({}, impl, { uploadAvatar });
+module.exports = Object.assign({}, impl, { uploadAvatar, exportCsv });

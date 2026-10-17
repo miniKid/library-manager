@@ -909,6 +909,786 @@ async function sendOverdueRemind() {
   return { ok: true };
 }
 
+/* ==================================================================
+ * 第二期：通知 / 待办 / 书评 / 统计导出 / 推荐
+ * 与 cloud.js 保持同名同签名；云端有权限校验，这里为本地体验简化
+ * ================================================================== */
+
+const DEFAULT_PREFS = { borrow: true, due: true, overdue: true, card: true, system: true, review: true };
+
+function ensureCollections(db) {
+  ['reviews', 'notifications', 'todos', 'noticeLogs'].forEach((k) => {
+    if (!Array.isArray(db[k])) db[k] = [];
+  });
+  return db;
+}
+
+function meUser(db) {
+  const openid = currentSessionOpenid();
+  return (db.users || []).find((u) => u.openid === openid) || null;
+}
+
+function isAdminMe(db) {
+  const u = meUser(db);
+  return !!(u && u.role === ROLE.ADMIN);
+}
+
+function nowStr() {
+  return formatCST(Date.now(), true);
+}
+
+/* ---------------- 通知 ---------------- */
+
+async function getNotifications(options) {
+  const { page = 1, pageSize = 20, onlyUnread = false } = options || {};
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  let list = (db.notifications || []).filter((n) => n.toOpenid === openid);
+  if (onlyUnread) list = list.filter((n) => !n.read);
+  list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const total = list.length;
+  const pageList = list.slice((page - 1) * pageSize, page * pageSize).map((n) => ({
+    _id: n._id,
+    type: n.type,
+    title: n.title,
+    content: n.content,
+    link: n.link,
+    level: n.level || 'info',
+    read: !!n.read,
+    senderName: n.senderName || '',
+    createdAtText: formatCST(n.createdAt, true)
+  }));
+  return { list: pageList, total, page, pageSize };
+}
+
+async function getUnreadNotifCount() {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  return (db.notifications || []).filter((n) => n.toOpenid === openid && !n.read).length;
+}
+
+async function markNotifRead(id) {
+  const db = ensureCollections(getDb());
+  const n = (db.notifications || []).find((x) => x._id === id);
+  if (!n) return { ok: false, msg: '通知不存在' };
+  n.read = true;
+  n.readAt = Date.now();
+  saveDb(db);
+  return { ok: true };
+}
+
+async function markAllNotifRead() {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  let n = 0;
+  (db.notifications || []).forEach((x) => {
+    if (x.toOpenid === openid && !x.read) {
+      x.read = true;
+      x.readAt = Date.now();
+      n++;
+    }
+  });
+  saveDb(db);
+  return { ok: true, data: { updated: n } };
+}
+
+async function getNotifyPrefs() {
+  const db = ensureCollections(getDb());
+  const u = meUser(db);
+  return Object.assign({}, DEFAULT_PREFS, (u && u.notifyPrefs) || {});
+}
+
+async function saveNotifyPrefs(prefs) {
+  const db = ensureCollections(getDb());
+  const u = meUser(db);
+  if (!u) return { ok: false, msg: '请先登录' };
+  const next = Object.assign({}, DEFAULT_PREFS, u.notifyPrefs || {});
+  Object.keys(DEFAULT_PREFS).forEach((k) => {
+    if (k === 'system') return;
+    if (prefs && typeof prefs[k] === 'boolean') next[k] = prefs[k];
+  });
+  u.notifyPrefs = next;
+  saveDb(db);
+  return { ok: true, data: { prefs: next } };
+}
+
+/* ---------------- 待办 ---------------- */
+
+async function getTodos() {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const admin = isAdminMe(db);
+  const today = cstTodayStr();
+  const system = [];
+
+  if (admin) {
+    const cardPending = (db.users || []).filter((u) => u.card && u.card.status === CARD_STATUS.PENDING).length;
+    const borrowPending = (db.borrows || []).filter((r) => r.status === BORROW_STATUS.PENDING).length;
+    const returnPending = (db.borrows || []).filter((r) => r.status === BORROW_STATUS.RETURN_REQUESTED).length;
+    const overdue = (db.borrows || []).filter(
+      (r) => r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < today
+    ).length;
+    if (cardPending) system.push({ id: 'sys-admin-card', type: 'system', title: `有 ${cardPending} 条借书证申请待审批`, desc: '点击进入成员管理处理', level: 'warning', link: '/pages/admin/members/index?tab=pending' });
+    if (borrowPending) system.push({ id: 'sys-admin-borrow', type: 'system', title: `有 ${borrowPending} 笔借出待确认`, desc: '线下交收后线上确认', level: 'warning', link: '/pages/admin/borrows/index?status=pending' });
+    if (returnPending) system.push({ id: 'sys-admin-return', type: 'system', title: `有 ${returnPending} 笔归还待确认`, desc: '回收后线上确认', level: 'warning', link: '/pages/admin/borrows/index?status=return_requested' });
+    if (overdue) system.push({ id: 'sys-admin-overdue', type: 'system', title: `有 ${overdue} 本书已逾期未还`, desc: '可发送逾期提醒', level: 'danger', link: '/pages/admin/borrows/index?status=overdue' });
+  } else {
+    (db.borrows || [])
+      .filter((r) => r.userId === openid && ['pending', 'borrowing', 'return_requested'].indexOf(r.status) >= 0)
+      .forEach((r) => {
+        const title = r.bookTitle || '图书';
+        if (r.status === BORROW_STATUS.BORROWING && r.dueDate) {
+          const due = cstDateStr(r.dueDate);
+          const left = Math.round((new Date(due + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 86400000);
+          if (left < 0) system.push({ id: 'sys-overdue-' + r._id, type: 'system', title: `《${title}》已逾期 ${-left} 天`, desc: '请尽快提交还书申请', level: 'danger', dueDateText: due, link: '/pages/my/borrows/index' });
+          else if (left <= 3) system.push({ id: 'sys-due-' + r._id, type: 'system', title: `《${title}》还有 ${left} 天到期`, desc: '可续借，或按时归还', level: 'warning', dueDateText: due, link: '/pages/my/borrows/index' });
+        }
+        if (r.status === BORROW_STATUS.RETURN_REQUESTED) system.push({ id: 'sys-ret-' + r._id, type: 'system', title: `《${title}》等待管理员确认归还`, desc: '请按时到馆交接', level: 'info', dueDateText: r.scheduledReturnDate || '', link: '/pages/my/borrows/index' });
+        if (r.status === BORROW_STATUS.PENDING && r.scheduledPickupDate) {
+          const gap = Math.round((new Date(r.scheduledPickupDate + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 86400000);
+          if (gap <= 1) system.push({ id: 'sys-pick-' + r._id, type: 'system', title: `《${title}》待取书`, desc: gap <= 0 ? '取书日期已到，请到馆领取' : '取书日期是明天', level: 'warning', dueDateText: r.scheduledPickupDate, link: '/pages/my/borrows/index' });
+        }
+      });
+  }
+
+  const mine = (db.todos || []).filter((t) => t.ownerOpenid === openid);
+  const active = [];
+  const done = [];
+  mine.forEach((t) => {
+    const item = {
+      id: t._id,
+      type: 'custom',
+      title: t.title,
+      desc: t.note || '',
+      priority: t.priority || 'normal',
+      level: t.priority === 'high' ? 'danger' : t.priority === 'low' ? 'info' : 'warning',
+      dueDateText: t.dueDate || '',
+      done: !!t.done,
+      overdue: !t.done && t.dueDate && t.dueDate < today,
+      overdueDays: !t.done && t.dueDate && t.dueDate < today
+        ? Math.round((new Date(today + 'T00:00:00Z') - new Date(t.dueDate + 'T00:00:00Z')) / 86400000)
+        : 0,
+      createdAtText: formatCST(t.createdAt, true)
+    };
+    (t.done ? done : active).push(item);
+  });
+  active.sort((a, b) => {
+    if (a.dueDateText && b.dueDateText) return a.dueDateText < b.dueDateText ? -1 : 1;
+    if (a.dueDateText) return -1;
+    if (b.dueDateText) return 1;
+    return 0;
+  });
+  return { isAdmin: admin, system, active, done, today };
+}
+
+async function addTodo(data) {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const title = String((data && data.title) || '').trim();
+  if (!title) return { ok: false, msg: '请填写待办标题' };
+  if (title.length > 30) return { ok: false, msg: '标题最多 30 个字' };
+  const activeCount = (db.todos || []).filter((t) => t.ownerOpenid === openid && !t.done).length;
+  if (activeCount >= 100) return { ok: false, msg: '未完成待办已达 100 条，请先清理' };
+  const todo = {
+    _id: genId('td'),
+    ownerOpenid: openid,
+    title,
+    note: String((data && data.note) || '').trim(),
+    dueDate: /^\d{4}-\d{2}-\d{2}$/.test((data && data.dueDate) || '') ? data.dueDate : '',
+    priority: ['high', 'normal', 'low'].indexOf(data && data.priority) >= 0 ? data.priority : 'normal',
+    done: false,
+    doneAt: null,
+    createdAt: Date.now()
+  };
+  db.todos.push(todo);
+  saveDb(db);
+  return { ok: true, data: { id: todo._id } };
+}
+
+async function toggleTodo(id, done) {
+  const db = ensureCollections(getDb());
+  const t = (db.todos || []).find((x) => x._id === id);
+  if (!t) return { ok: false, msg: '待办不存在' };
+  t.done = typeof done === 'boolean' ? done : !t.done;
+  t.doneAt = t.done ? Date.now() : null;
+  saveDb(db);
+  return { ok: true, data: { done: t.done } };
+}
+
+async function removeTodo(id) {
+  const db = ensureCollections(getDb());
+  const idx = (db.todos || []).findIndex((x) => x._id === id);
+  if (idx < 0) return { ok: false, msg: '待办不存在' };
+  db.todos.splice(idx, 1);
+  saveDb(db);
+  return { ok: true };
+}
+
+/* ---------------- 管理端群发 ---------------- */
+
+async function sendNotification(data) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { ok: false, msg: '无权限执行此操作' };
+  const title = String((data && data.title) || '').trim();
+  const content = String((data && data.content) || '').trim();
+  if (!title) return { ok: false, msg: '请填写通知标题' };
+  const type = (data && data.type) || 'system';
+  const me = meUser(db);
+  let targets = db.users || [];
+  if (data && data.scope === 'location' && data.location) {
+    targets = targets.filter((u) => u.card && u.card.location === data.location);
+  }
+  targets = targets.filter((u) => type === 'system' || !(u.notifyPrefs && u.notifyPrefs[type] === false));
+  targets.forEach((u) => {
+    db.notifications.push({
+      _id: genId('nt'),
+      toOpenid: u.openid,
+      type,
+      title,
+      content,
+      link: (data && data.link) || '',
+      level: type === 'system' ? 'info' : 'warning',
+      read: false,
+      readAt: null,
+      senderOpenid: me ? me.openid : '',
+      senderName: (me && me.nickname) || '图书馆',
+      createdAt: Date.now()
+    });
+  });
+  db.noticeLogs.push({
+    _id: genId('nl'),
+    senderOpenid: me ? me.openid : '',
+    senderName: (me && me.nickname) || '图书馆',
+    title,
+    content,
+    type,
+    scope: (data && data.scope) || 'all',
+    location: (data && data.location) || '',
+    targetCount: targets.length,
+    truncated: false,
+    createdAt: Date.now()
+  });
+  saveDb(db);
+  return { ok: true, data: { sent: targets.length, truncated: false } };
+}
+
+async function getSentNotifications(options) {
+  const { page = 1, pageSize = 20 } = options || {};
+  const db = ensureCollections(getDb());
+  const list = (db.noticeLogs || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  return {
+    list: list.slice((page - 1) * pageSize, page * pageSize).map((r) => Object.assign({}, r, { createdAtText: formatCST(r.createdAt, true) })),
+    total: list.length,
+    page,
+    pageSize
+  };
+}
+
+/* ---------------- 书评 ---------------- */
+
+const REVIEW_BANNED = ['加微信', '代写', '刷单', '博彩', '色情', '贷款', '兼职日结'];
+
+function refreshBookRating(db, bookId) {
+  const rows = (db.reviews || []).filter((r) => r.bookId === bookId && r.status === 'approved');
+  const book = (db.books || []).find((b) => b._id === bookId);
+  if (!book) return;
+  book.ratingCount = rows.length;
+  book.reviewCount = rows.length;
+  book.ratingAvg = rows.length ? Math.round((rows.reduce((s, r) => s + (Number(r.rating) || 0), 0) / rows.length) * 10) / 10 : 0;
+}
+
+function shapeReview(r, openid) {
+  const anonymous = !!r.anonymous;
+  return {
+    _id: r._id,
+    bookId: r.bookId,
+    bookTitle: r.bookTitle || '',
+    userName: anonymous ? '匿名读者' : r.userName || '读者',
+    avatar: anonymous ? '' : r.avatar || '',
+    anonymous,
+    rating: Number(r.rating) || 0,
+    content: r.content || '',
+    likeCount: Number(r.likeCount) || 0,
+    liked: (r.likedBy || []).indexOf(openid) >= 0,
+    mine: r.openid === openid,
+    status: r.status || 'approved',
+    reply: r.reply || null,
+    replyText: r.reply ? formatCST(r.reply.createdAt, true) : '',
+    createdAtText: formatCST(r.createdAt, true),
+    edited: !!(r.updatedAt && r.createdAt && r.updatedAt - r.createdAt > 1000)
+  };
+}
+
+async function getReviews(options) {
+  const { bookId, page = 1, pageSize = 10, sort = 'latest' } = options || {};
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const rows = (db.reviews || []).filter((r) => r.bookId === bookId && r.status === 'approved');
+  rows.sort((a, b) => (sort === 'helpful' ? (b.likeCount || 0) - (a.likeCount || 0) : b.createdAt - a.createdAt));
+  const dist = [0, 0, 0, 0, 0];
+  rows.forEach((r) => {
+    const i = Math.round(Number(r.rating)) - 1;
+    if (i >= 0 && i < 5) dist[i]++;
+  });
+  const avg = rows.length ? Math.round((rows.reduce((s, r) => s + (Number(r.rating) || 0), 0) / rows.length) * 10) / 10 : 0;
+  return {
+    list: rows.slice((page - 1) * pageSize, page * pageSize).map((r) => shapeReview(r, openid)),
+    total: rows.length,
+    page,
+    pageSize,
+    summary: { count: rows.length, avg, dist }
+  };
+}
+
+async function getMyReview(bookId) {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const r = (db.reviews || []).find((x) => x.bookId === bookId && x.openid === openid);
+  if (!r) return null;
+  return { _id: r._id, rating: r.rating, content: r.content, anonymous: !!r.anonymous, status: r.status };
+}
+
+async function submitReview(data) {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const bookId = data && data.bookId;
+  const book = (db.books || []).find((b) => b._id === bookId);
+  if (!book) return { ok: false, msg: '图书不存在' };
+  const rating = Math.round(Number(data.rating) || 0);
+  if (rating < 1 || rating > 5) return { ok: false, msg: '请先选择 1-5 星评分' };
+  const content = String(data.content || '').trim();
+  if (content.length < 5) return { ok: false, msg: '评论至少 5 个字' };
+  if (content.length > 500) return { ok: false, msg: '评论最多 500 个字' };
+  if (REVIEW_BANNED.some((w) => content.indexOf(w) >= 0)) return { ok: false, msg: '内容包含不适合发布的词汇' };
+  const me = meUser(db);
+  const exist = (db.reviews || []).find((r) => r.bookId === bookId && r.openid === openid);
+  if (exist) {
+    exist.rating = rating;
+    exist.content = content;
+    exist.anonymous = !!data.anonymous;
+    exist.updatedAt = Date.now();
+    if (exist.status === 'hidden') exist.status = 'approved';
+    refreshBookRating(db, bookId);
+    saveDb(db);
+    return { ok: true, data: { id: exist._id, updated: true } };
+  }
+  const row = {
+    _id: genId('rv'),
+    bookId,
+    bookTitle: book.title,
+    openid,
+    userName: (me && me.nickname) || '读者',
+    avatar: (me && me.avatarUrl) || '',
+    anonymous: !!data.anonymous,
+    rating,
+    content,
+    likeCount: 0,
+    likedBy: [],
+    status: 'approved',
+    reply: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  db.reviews.push(row);
+  refreshBookRating(db, bookId);
+  saveDb(db);
+  return { ok: true, data: { id: row._id, created: true } };
+}
+
+async function removeMyReview(bookId) {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const idx = (db.reviews || []).findIndex((r) => r.bookId === bookId && r.openid === openid);
+  if (idx < 0) return { ok: false, msg: '评论不存在' };
+  db.reviews.splice(idx, 1);
+  refreshBookRating(db, bookId);
+  saveDb(db);
+  return { ok: true };
+}
+
+async function likeReview(reviewId) {
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const r = (db.reviews || []).find((x) => x._id === reviewId);
+  if (!r) return { ok: false, msg: '评论不存在' };
+  if (r.openid === openid) return { ok: false, msg: '不能给自己的评论点赞' };
+  r.likedBy = r.likedBy || [];
+  const i = r.likedBy.indexOf(openid);
+  if (i >= 0) {
+    r.likedBy.splice(i, 1);
+    r.likeCount = Math.max(0, (r.likeCount || 0) - 1);
+  } else {
+    r.likedBy.push(openid);
+    r.likeCount = (r.likeCount || 0) + 1;
+  }
+  saveDb(db);
+  return { ok: true, data: { liked: i < 0, likeCount: r.likeCount } };
+}
+
+async function adminGetReviews(options) {
+  const { status = 'all', keyword = '', page = 1, pageSize = 20 } = options || {};
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { list: [], total: 0, msg: '无权限' };
+  let rows = (db.reviews || []).slice();
+  if (status !== 'all') rows = rows.filter((r) => r.status === status);
+  if (keyword) rows = rows.filter((r) => (r.content || '').indexOf(keyword) >= 0);
+  rows.sort((a, b) => b.createdAt - a.createdAt);
+  return {
+    list: rows.slice((page - 1) * pageSize, page * pageSize).map((r) => Object.assign(shapeReview(r, ''), { openid: r.openid })),
+    total: rows.length,
+    page,
+    pageSize
+  };
+}
+
+async function adminSetReviewStatus(reviewId, status) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { ok: false, msg: '无权限执行此操作' };
+  const r = (db.reviews || []).find((x) => x._id === reviewId);
+  if (!r) return { ok: false, msg: '评论不存在' };
+  r.status = status === 'hidden' ? 'hidden' : 'approved';
+  refreshBookRating(db, r.bookId);
+  saveDb(db);
+  return { ok: true };
+}
+
+async function adminRemoveReview(reviewId) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { ok: false, msg: '无权限执行此操作' };
+  const idx = (db.reviews || []).findIndex((x) => x._id === reviewId);
+  if (idx < 0) return { ok: false, msg: '评论不存在' };
+  const bookId = db.reviews[idx].bookId;
+  db.reviews.splice(idx, 1);
+  refreshBookRating(db, bookId);
+  saveDb(db);
+  return { ok: true };
+}
+
+async function adminReplyReview(reviewId, content) {
+  const db = ensureCollections(getDb());
+  const me = meUser(db);
+  if (!isAdminMe(db)) return { ok: false, msg: '无权限执行此操作' };
+  const text = String(content || '').trim();
+  if (!text) return { ok: false, msg: '请填写回复内容' };
+  const r = (db.reviews || []).find((x) => x._id === reviewId);
+  if (!r) return { ok: false, msg: '评论不存在' };
+  r.reply = { content: text, openid: me.openid, createdAt: Date.now() };
+  db.notifications.push({
+    _id: genId('nt'),
+    toOpenid: r.openid,
+    type: 'review',
+    title: '馆员回复了你的书评',
+    content: `《${r.bookTitle}》：${text.slice(0, 40)}`,
+    link: `/pages/book-reviews/index?bookId=${r.bookId}`,
+    level: 'info',
+    read: false,
+    readAt: null,
+    senderOpenid: me.openid,
+    senderName: me.nickname || '馆员',
+    createdAt: Date.now()
+  });
+  saveDb(db);
+  return { ok: true };
+}
+
+/* ---------------- 统计与导出 ---------------- */
+
+function daysAgo(days) {
+  return Date.now() - (days - 1) * 86400000;
+}
+
+function bucketTrend(items, days, pick) {
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = cstDateStr(Date.now() - i * 86400000);
+    out.push({ label: d.slice(5), value: items.filter((x) => cstDateStr(pick(x)) === d).length });
+  }
+  return out;
+}
+
+function toCsv(headers, rows) {
+  const esc = (v) => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return '\ufeff' + [headers.map(esc).join(',')].concat(rows.map((r) => r.map(esc).join(','))).join('\r\n');
+}
+
+async function getUserStats(days) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { error: '无权限' };
+  const d = days || 30;
+  const start = daysAgo(d);
+  const users = db.users || [];
+  const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
+  const inRange = borrows.filter((r) => new Date(r.borrowDate).getTime() >= start);
+
+  const byUserId = {};
+  inRange.forEach((r) => {
+    byUserId[r.userId] = (byUserId[r.userId] || 0) + 1;
+  });
+  const groups = Object.keys(byUserId).map((k) => ({ id: k, n: byUserId[k] })).sort((a, b) => b.n - a.n);
+
+  const locs = (getSettingsDb(db).locations || []);
+  const byLocation = locs.map((loc) => ({ label: loc, value: users.filter((u) => u.card && u.card.location === loc).length })).sort((a, b) => b.value - a.value);
+
+  const activeCards = users.filter((u) => u.card && u.card.status === CARD_STATUS.ACTIVE).length;
+  const buckets = [
+    { label: '0 次', value: Math.max(0, users.length - groups.length) },
+    { label: '1-2 次', value: groups.filter((g) => g.n <= 2).length },
+    { label: '3-5 次', value: groups.filter((g) => g.n >= 3 && g.n <= 5).length },
+    { label: '6 次以上', value: groups.filter((g) => g.n >= 6).length }
+  ];
+
+  return {
+    days: d,
+    cards: {
+      total: users.length,
+      admins: users.filter((u) => u.role === ROLE.ADMIN).length,
+      activeCards,
+      pendingCards: users.filter((u) => u.card && u.card.status === CARD_STATUS.PENDING).length,
+      newUsers: users.filter((u) => new Date(u.createdAt).getTime() >= start).length,
+      borrowTotal: inRange.length,
+      activeBorrowers: groups.length,
+      perCapita: groups.length ? Math.round((inRange.length / groups.length) * 10) / 10 : 0
+    },
+    byLocation,
+    roleChart: [
+      { label: '普通用户', value: users.filter((u) => u.role !== ROLE.ADMIN).length },
+      { label: '管理员', value: users.filter((u) => u.role === ROLE.ADMIN).length }
+    ],
+    buckets,
+    trend: bucketTrend(users, d, (u) => u.createdAt),
+    topBorrowers: groups.slice(0, 20).map((g) => {
+      const u = users.find((x) => x.openid === g.id) || {};
+      return {
+        openid: g.id,
+        nickname: u.nickname || '已注销用户',
+        cardStatus: (u.card && u.card.status) || 'none',
+        location: (u.card && u.card.location) || '',
+        count: g.n
+      };
+    })
+  };
+}
+
+async function getBookStats(days) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { error: '无权限' };
+  const d = days || 30;
+  const start = daysAgo(d);
+  const books = db.books || [];
+  const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
+  const inRange = borrows.filter((r) => new Date(r.borrowDate).getTime() >= start);
+
+  const cat = {};
+  let copies = 0;
+  let available = 0;
+  let zeroStock = 0;
+  books.forEach((b) => {
+    const total = sumStocks(b.stocks);
+    copies += total;
+    const used = borrows.filter((r) => r.bookId === b._id && isActiveStatus(r.status)).length;
+    available += Math.max(0, total - used);
+    if (total <= 0) zeroStock++;
+    cat[b.category || '未分类'] = (cat[b.category || '未分类'] || 0) + 1;
+  });
+
+  const locs = getSettingsDb(db).locations || [];
+  const byLocation = locs.map((loc) => ({
+    label: loc,
+    value: books.reduce((s, b) => s + ((b.stocks && Number(b.stocks[loc])) || 0), 0)
+  }));
+
+  const hotMap = {};
+  inRange.forEach((r) => {
+    hotMap[r.bookId] = (hotMap[r.bookId] || 0) + 1;
+  });
+  let hotBooks = Object.keys(hotMap)
+    .map((id) => {
+      const b = books.find((x) => x._id === id) || {};
+      return { bookId: id, title: b.title || '未知图书', author: b.author || '', count: hotMap[id] };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+  if (!hotBooks.length) {
+    hotBooks = books
+      .slice()
+      .sort((a, b) => (b.borrowCount || 0) - (a.borrowCount || 0))
+      .slice(0, 20)
+      .map((b) => ({ bookId: b._id, title: b.title, author: b.author, count: b.borrowCount || 0 }));
+  }
+
+  const cold = books
+    .filter((b) => !b.borrowCount && b.createdAt && new Date(b.createdAt) < new Date(Date.now() - 30 * 86400000))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .slice(0, 20)
+    .map((b) => ({ bookId: b._id, title: b.title, author: b.author, createdAtText: formatCST(b.createdAt) }));
+
+  const dist = [0, 0, 0, 0, 0];
+  (db.reviews || []).filter((r) => r.status === 'approved').forEach((r) => {
+    const i = Math.round(Number(r.rating)) - 1;
+    if (i >= 0 && i < 5) dist[i]++;
+  });
+
+  return {
+    days: d,
+    cards: {
+      kinds: books.length,
+      copies,
+      available,
+      zeroStock,
+      newBooks: books.filter((b) => new Date(b.createdAt).getTime() >= start).length,
+      coldCount: cold.length
+    },
+    byLocation,
+    categoryChart: Object.keys(cat).map((k) => ({ label: k, value: cat[k] })).sort((a, b) => b.value - a.value),
+    hotBooks,
+    coldBooks: cold,
+    ratingChart: dist.map((n, i) => ({ label: i + 1 + ' 星', value: n })),
+    trend: bucketTrend(books, d, (b) => b.createdAt)
+  };
+}
+
+async function exportUsersCsv(days) {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { error: '无权限' };
+  const users = db.users || [];
+  const borrows = (db.borrows || []).filter((r) => r.status !== BORROW_STATUS.CANCELLED);
+  const rows = users.map((u) => {
+    const mine = borrows.filter((r) => r.userId === u.openid);
+    const last = mine.length ? mine[mine.length - 1].borrowDate : null;
+    const card = u.card || {};
+    return [
+      u.nickname || '',
+      u.role === ROLE.ADMIN ? '管理员' : '普通用户',
+      card.status === 'active' ? '已开通' : card.status === 'pending' ? '审批中' : card.status === 'rejected' ? '已驳回' : '未申请',
+      card.location || '',
+      String(card.phone || '').replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'),
+      formatCST(u.createdAt),
+      mine.length,
+      last ? formatCST(last) : ''
+    ];
+  });
+  return {
+    filename: `用户统计_${cstTodayStr().replace(/-/g, '')}.csv`,
+    content: toCsv(['昵称', '角色', '借书证状态', '归属馆藏', '手机号', '注册时间', '累计借阅', '最近借阅'], rows),
+    rows: rows.length,
+    truncated: false
+  };
+}
+
+async function exportBooksCsv() {
+  const db = ensureCollections(getDb());
+  if (!isAdminMe(db)) return { error: '无权限' };
+  const books = db.books || [];
+  const rows = books.map((b) => [
+    b.title,
+    b.author,
+    b.isbn,
+    b.category,
+    b.publisher,
+    b.year,
+    sumStocks(b.stocks),
+    sumStocks(b.stocks),
+    b.borrowCount || 0,
+    b.ratingAvg || 0,
+    b.ratingCount || 0,
+    formatCST(b.createdAt)
+  ]);
+  return {
+    filename: `书籍统计_${cstTodayStr().replace(/-/g, '')}.csv`,
+    content: toCsv(['书名', '作者', 'ISBN', '分类', '出版社', '出版年', '馆藏总册', '在架册数', '累计借阅', '平均评分', '评论数', '上架时间'], rows),
+    rows: rows.length,
+    truncated: false
+  };
+}
+
+/* ---------------- 推荐 ---------------- */
+
+async function getRecommendations(options) {
+  const { limit = 6, offset = 0 } = options || {};
+  const db = ensureCollections(getDb());
+  const openid = currentSessionOpenid();
+  const books = (db.books || []).filter((b) => sumStocks(b.stocks) > 0);
+  const myBorrows = (db.borrows || []).filter((r) => r.userId === openid);
+  const borrowedIds = myBorrows.map((r) => r.bookId);
+  const myReviews = (db.reviews || []).filter((r) => r.openid === openid).map((r) => r.bookId);
+
+  const cat = {};
+  const authors = {};
+  let totalCat = 0;
+  borrowedIds.forEach((id) => {
+    const b = books.find((x) => x._id === id);
+    if (!b) return;
+    if (b.category) {
+      cat[b.category] = (cat[b.category] || 0) + 1;
+      totalCat++;
+    }
+    if (b.author) authors[b.author] = true;
+  });
+
+  const maxHot = books.reduce((m, b) => Math.max(m, b.borrowCount || 0), 0) || 1;
+  const now = Date.now();
+
+  const scored = books
+    .filter((b) => borrowedIds.indexOf(b._id) < 0 && myReviews.indexOf(b._id) < 0)
+    .map((b) => {
+      const catScore = totalCat ? ((cat[b.category] || 0) / totalCat) * 35 : 0;
+      const authorScore = authors[b.author] ? 15 : 0;
+      const hotScore = ((b.borrowCount || 0) / maxHot) * 20;
+      const rating = b.ratingAvg || 3;
+      const rateScore = (rating / 5) * 20;
+      const age = b.createdAt ? (now - new Date(b.createdAt).getTime()) / 86400000 : 999;
+      const newScore = age <= 30 ? 10 : Math.max(0, 10 - (age - 30) / 30);
+      const score = catScore + authorScore + hotScore + rateScore + newScore;
+      let reason = '新书上架';
+      if (catScore > 0 && catScore >= authorScore && catScore >= hotScore) reason = `因为你在读「${b.category}」类`;
+      else if (authorScore > 0) reason = `你借过 ${b.author} 的书`;
+      else if (hotScore >= rateScore) reason = '本馆热门';
+      else if (b.ratingCount) reason = `读者好评 ${rating} 分`;
+      return { book: b, score, reason };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const authorCount = {};
+  const ordered = [];
+  scored.forEach((it) => {
+    const a = it.book.author || '';
+    authorCount[a] = authorCount[a] || 0;
+    if (authorCount[a] >= 2) return;
+    authorCount[a]++;
+    ordered.push(it);
+  });
+  const slice = ordered.slice(offset, offset + limit);
+  return {
+    list: slice.map((it) => ({
+      _id: it.book._id,
+      title: it.book.title,
+      author: it.book.author,
+      category: it.book.category,
+      cover: it.book.cover || '',
+      borrowCount: it.book.borrowCount || 0,
+      ratingAvg: it.book.ratingAvg || 0,
+      ratingCount: it.book.ratingCount || 0,
+      reason: it.reason,
+      score: Math.round(it.score)
+    })),
+    total: ordered.length,
+    hasMore: offset + limit < ordered.length
+  };
+}
+
+/** 本地模式无云存储：头像直接沿用本地临时路径 */
+async function uploadAvatar(localPath) {
+  return localPath;
+}
+
+/** CSV 导出与云模式共用同一实现（见 services/export.js） */
+async function exportCsv(payload) {
+  return require('./export').exportCsv(payload);
+}
+
 module.exports = {
   init,
   login,
@@ -947,5 +1727,34 @@ module.exports = {
   saveSettings,
   getSchedules,
   saveSchedule,
-  sendOverdueRemind
+  sendOverdueRemind,
+  // 第二期
+  getNotifications,
+  getUnreadNotifCount,
+  markNotifRead,
+  markAllNotifRead,
+  getNotifyPrefs,
+  saveNotifyPrefs,
+  getTodos,
+  addTodo,
+  toggleTodo,
+  removeTodo,
+  sendNotification,
+  getSentNotifications,
+  getReviews,
+  getMyReview,
+  submitReview,
+  removeMyReview,
+  likeReview,
+  adminGetReviews,
+  adminSetReviewStatus,
+  adminReplyReview,
+  adminRemoveReview,
+  getUserStats,
+  getBookStats,
+  exportUsersCsv,
+  exportBooksCsv,
+  exportCsv,
+  uploadAvatar,
+  getRecommendations
 };

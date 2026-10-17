@@ -1,0 +1,9 @@
+{
+  "name": "reviewManager",
+  "version": "1.0.0",
+  "description": "书籍书评：新增/编辑/删除、点赞、管理员审核与回复",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

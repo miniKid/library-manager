@@ -1,0 +1,41 @@
+<view class="container">
+  <view class="hint">
+    <text class="hint-icon">✨</text>
+    <text>根据你的借阅与评分生成，可在首页「为你推荐」查看精选</text>
+  </view>
+
+  <view
+    wx:for="{{list}}"
+    wx:key="_id"
+    class="card book"
+    data-id="{{item._id}}"
+    bindtap="onTapBook"
+  >
+    <view class="cover" style="background: {{item.coverBg}}">
+      <image wx:if="{{item.cover}}" class="cover-img" src="{{item.cover}}" mode="aspectFill" />
+      <text wx:else class="cover-text">{{item.initial}}</text>
+    </view>
+    <view class="info">
+      <view class="title ellipsis">{{item.title}}</view>
+      <view class="author ellipsis">{{item.author || '佚名'}}</view>
+      <view class="meta">
+        <text class="tag tag-blue">{{item.category || '未分类'}}</text>
+        <text wx:if="{{item.ratingCount}}" class="tag tag-orange">{{item.ratingAvg}} 分</text>
+        <text wx:if="{{item.borrowCount}}" class="tag tag-gray">借过 {{item.borrowCount}} 次</text>
+      </view>
+      <view class="reason">{{item.reason}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">正在挑选…</view>
+  <view wx:if="{{!loading && !list.length}}" class="empty">
+    <view class="empty-icon">📚</view>
+    <view>暂时没有可推荐的书</view>
+  </view>
+
+  <view class="foot">
+    <button wx:if="{{hasMore}}" class="btn-plain" bindtap="onMore">加载更多</button>
+    <button wx:else class="btn-plain" bindtap="onRestart">换一批</button>
+    <view wx:if="{{done && list.length}}" class="foot-tip">已为你推荐全部 {{list.length}} 本</view>
+  </view>
+</view>

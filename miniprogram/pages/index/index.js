@@ -14,7 +14,8 @@ Page({
     total: 0,
     loading: false,
     finished: false,
-    logged: false
+    logged: false,
+    recommends: []
   },
   timer: null,
 
@@ -22,6 +23,29 @@ Page({
     const app = getApp();
     this.setData({ logged: !!app.globalData.userInfo });
     this.loadLocations();
+    this.loadRecommends();
+  },
+
+  /** 首页「为你推荐」：未登录也会返回冷启动结果（热门 + 高分 + 新书） */
+  async loadRecommends() {
+    try {
+      const res = await services.getRecommendations({ limit: 6, offset: 0 });
+      const list = (res.list || []).map((b) => ({
+        _id: b._id,
+        title: b.title,
+        reason: b.reason,
+        cover: b.cover || '',
+        coverBg: hashColor(b.title),
+        initial: String(b.title || '书').charAt(0)
+      }));
+      this.setData({ recommends: list });
+    } catch (e) {
+      this.setData({ recommends: [] });
+    }
+  },
+
+  goRecommend() {
+    wx.navigateTo({ url: '/pages/recommend/index' });
   },
 
   async loadLocations() {

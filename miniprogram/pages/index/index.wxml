@@ -29,6 +29,24 @@
     >{{item}}可借</view>
   </view>
 
+  <!-- 为你推荐（搜索/筛选时隐藏，避免干扰结果） -->
+  <view class="rec" wx:if="{{recommends.length && !keyword && !activeLocation}}">
+    <view class="rec-head">
+      <text class="rec-title">✨ 为你推荐</text>
+      <text class="rec-more" bindtap="goRecommend">更多 ›</text>
+    </view>
+    <scroll-view class="rec-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="rec-item" wx:for="{{recommends}}" wx:key="_id" data-id="{{item._id}}" bindtap="goDetail">
+        <view class="rec-cover" style="background: {{item.coverBg}}">
+          <image wx:if="{{item.cover}}" class="rec-img" src="{{item.cover}}" mode="aspectFill" />
+          <text wx:else class="rec-initial">{{item.initial}}</text>
+        </view>
+        <view class="rec-name ellipsis">{{item.title}}</view>
+        <view class="rec-reason ellipsis">{{item.reason}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
   <!-- 图书列表 -->
   <view class="container" wx:if="{{books.length > 0}}">
     <view

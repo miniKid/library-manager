@@ -1,0 +1,9 @@
+{
+  "name": "insightManager",
+  "version": "1.0.0",
+  "description": "用户/书籍统计、CSV 导出、个性化推荐计算",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -3,6 +3,7 @@
  * 使用云数据库（books / borrows / users）+ 云函数（login / initDB）
  */
 const env = require('../config/env');
+const { exportCsv } = require('./export');
 const { BORROW_STATUS } = require('../utils/constants');
 const { formatDate, formatCST, cstDateStr, cstTodayStr } = require('../utils/util');
 
@@ -527,8 +528,163 @@ async function lookupBook(isbn) {
   return res.result;
 }
 
+/** 头像上传的实际实现位于 services/index.js（需要 env.useCloud 判断），此处保持双实现导出面一致 */
+function uploadAvatar(localPath) {
+  return localPath;
+}
+
+/* ==================== 第二期：通知 / 待办 / 评论 / 统计 / 推荐 ==================== */
+
+/** 统一调用云函数并解包 result（出错返回 {ok:false,msg}） */
+async function invoke(name, data) {
+  try {
+    const res = await wx.cloud.callFunction({ name, data });
+    return res.result || { ok: false, msg: '无返回结果' };
+  } catch (e) {
+    return handleError(e);
+  }
+}
+
+/* ---------- 通知 ---------- */
+
+async function getNotifications({ page = 1, pageSize = 20, onlyUnread = false } = {}) {
+  const r = await invoke('notifyManager', { action: 'list', page, pageSize, onlyUnread });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+async function getUnreadNotifCount() {
+  const r = await invoke('notifyManager', { action: 'unreadCount' });
+  return (r.ok && r.data && r.data.count) || 0;
+}
+
+function markNotifRead(id) {
+  return invoke('notifyManager', { action: 'markRead', id });
+}
+
+function markAllNotifRead() {
+  return invoke('notifyManager', { action: 'markAllRead' });
+}
+
+async function getNotifyPrefs() {
+  const r = await invoke('notifyManager', { action: 'getPrefs' });
+  return (r.ok && r.data && r.data.prefs) || {};
+}
+
+async function saveNotifyPrefs(prefs) {
+  const r = await invoke('notifyManager', { action: 'savePrefs', prefs });
+  return r.ok ? r : { ok: false, msg: r.msg || '保存失败' };
+}
+
+/* ---------- 待办 ---------- */
+
+async function getTodos() {
+  const r = await invoke('notifyManager', { action: 'listTodos' });
+  if (!r.ok) return { system: [], active: [], done: [], isAdmin: false, msg: r.msg };
+  return r.data || { system: [], active: [], done: [] };
+}
+
+function addTodo(data) {
+  return invoke('notifyManager', Object.assign({ action: 'addTodo' }, data));
+}
+
+function toggleTodo(id, done) {
+  return invoke('notifyManager', { action: 'toggleTodo', id, done });
+}
+
+function removeTodo(id) {
+  return invoke('notifyManager', { action: 'removeTodo', id });
+}
+
+/* ---------- 管理端群发 ---------- */
+
+async function sendNotification(data) {
+  const r = await invoke('notifyManager', Object.assign({ action: 'send' }, data));
+  return r.ok ? r : { ok: false, msg: r.msg || '发送失败' };
+}
+
+async function getSentNotifications({ page = 1, pageSize = 20 } = {}) {
+  const r = await invoke('notifyManager', { action: 'sentList', page, pageSize });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+/* ---------- 书评 ---------- */
+
+async function getReviews({ bookId, page = 1, pageSize = 10, sort = 'latest' } = {}) {
+  const r = await invoke('reviewManager', { action: 'listReviews', bookId, page, pageSize, sort });
+  if (!r.ok) return { list: [], total: 0, summary: { count: 0, avg: 0, dist: [0, 0, 0, 0, 0] }, msg: r.msg };
+  return r.data;
+}
+
+async function getMyReview(bookId) {
+  const r = await invoke('reviewManager', { action: 'myReview', bookId });
+  return (r.ok && r.data) || null;
+}
+
+function submitReview({ bookId, rating, content, anonymous }) {
+  return invoke('reviewManager', { action: 'addReview', bookId, rating, content, anonymous: !!anonymous });
+}
+
+function removeMyReview(bookId) {
+  return invoke('reviewManager', { action: 'removeReview', bookId });
+}
+
+function likeReview(reviewId) {
+  return invoke('reviewManager', { action: 'likeReview', reviewId });
+}
+
+async function adminGetReviews({ status = 'all', keyword = '', page = 1, pageSize = 20 } = {}) {
+  const r = await invoke('reviewManager', { action: 'adminReviews', status, keyword, page, pageSize });
+  if (!r.ok) return { list: [], total: 0, msg: r.msg };
+  return r.data || { list: [], total: 0 };
+}
+
+function adminSetReviewStatus(reviewId, status) {
+  return invoke('reviewManager', { action: 'setReviewStatus', reviewId, status });
+}
+
+function adminReplyReview(reviewId, content) {
+  return invoke('reviewManager', { action: 'replyReview', reviewId, content });
+}
+
+function adminRemoveReview(reviewId) {
+  return invoke('reviewManager', { action: 'removeReview', reviewId });
+}
+
+/* ---------- 统计与导出 ---------- */
+
+async function getUserStats(days = 30) {
+  const r = await invoke('insightManager', { action: 'userStats', days });
+  return r.ok ? r.data : { error: r.msg || '统计失败' };
+}
+
+async function getBookStats(days = 30) {
+  const r = await invoke('insightManager', { action: 'bookStats', days });
+  return r.ok ? r.data : { error: r.msg || '统计失败' };
+}
+
+async function exportUsersCsv(days = 30) {
+  const r = await invoke('insightManager', { action: 'exportUsers', days });
+  return r.ok ? r.data : { error: r.msg || '导出失败' };
+}
+
+async function exportBooksCsv(days = 30) {
+  const r = await invoke('insightManager', { action: 'exportBooks', days });
+  return r.ok ? r.data : { error: r.msg || '导出失败' };
+}
+
+/* ---------- 推荐 ---------- */
+
+async function getRecommendations({ limit = 6, offset = 0 } = {}) {
+  const r = await invoke('insightManager', { action: 'recommend', limit, offset });
+  if (!r.ok) return { list: [], total: 0, hasMore: false, msg: r.msg };
+  return r.data || { list: [], total: 0, hasMore: false };
+}
+
 module.exports = {
   init,
+  uploadAvatar,
   login,
   updateProfile,
   updateCardLocation,
@@ -564,5 +720,33 @@ module.exports = {
   getSettings,
   saveSettings,
   getSchedules,
-  saveSchedule
+  saveSchedule,
+  // 第二期
+  getNotifications,
+  getUnreadNotifCount,
+  markNotifRead,
+  markAllNotifRead,
+  getNotifyPrefs,
+  saveNotifyPrefs,
+  getTodos,
+  addTodo,
+  toggleTodo,
+  removeTodo,
+  sendNotification,
+  getSentNotifications,
+  getReviews,
+  getMyReview,
+  submitReview,
+  removeMyReview,
+  likeReview,
+  adminGetReviews,
+  adminSetReviewStatus,
+  adminReplyReview,
+  adminRemoveReview,
+  getUserStats,
+  getBookStats,
+  exportUsersCsv,
+  exportBooksCsv,
+  exportCsv,
+  getRecommendations
 };

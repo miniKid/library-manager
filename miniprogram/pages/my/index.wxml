@@ -20,6 +20,25 @@
     <view wx:if="{{isAdmin}}" class="admin-entry" bindtap="goAdmin">管理后台 ›</view>
   </view>
 
+  <!-- 快捷入口：消息与待办 / 为你推荐 -->
+  <view class="card quick" wx:if="{{userInfo}}">
+    <view class="quick-item" bindtap="goMessage">
+      <text class="quick-label">🔔 消息通知</text>
+      <view class="quick-right">
+        <text wx:if="{{unreadCount}}" class="quick-badge">{{unreadCount > 99 ? '99+' : unreadCount}}</text>
+        <text class="nav-btn-arrow">›</text>
+      </view>
+    </view>
+    <view class="quick-item" bindtap="goTodos">
+      <text class="quick-label">✅ 我的待办</text>
+      <text class="nav-btn-arrow">›</text>
+    </view>
+    <view class="quick-item" bindtap="goRecommend">
+      <text class="quick-label">✨ 为你推荐</text>
+      <text class="nav-btn-arrow">›</text>
+    </view>
+  </view>
+
   <!-- 借书证（管理员身份只是叠加的管理权限，借书证区对所有用户按其卡状态展示） -->
   <view class="section" wx:if="{{userInfo && cardInfo}}">
     <view class="section-header">

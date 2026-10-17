@@ -429,6 +429,15 @@ async function doConfirmBorrow(event) {
   // 确认借出成功后，向借书用户推送「借阅成功通知」（一次性订阅，用户已在借阅时授权）
   const rec = (await db.collection('borrows').doc(borrowId).get()).data;
   await sendBorrowOk(rec);
+  // 同时写一条站内通知，保证未授权订阅的用户也能在小程序内看到
+  await pushNotice(
+    rec.userId,
+    'borrow',
+    '借阅成功',
+    `《${rec.bookTitle || '图书'}》已借出，应还日期 ${cstDateStr(rec.dueDate)}`,
+    '/pages/my/borrows/index',
+    'info'
+  );
   return { ok: true };
 }
 
@@ -570,6 +579,30 @@ async function sendBorrowOk(record) {
   }
 }
 
+/** 写站内通知（notifications 集合仅云函数可写）；失败不影响主流程 */
+async function pushNotice(toOpenid, type, title, content, link, level) {
+  if (!toOpenid) return;
+  try {
+    await db.collection('notifications').add({
+      data: {
+        toOpenid,
+        type,
+        title,
+        content: content || '',
+        link: link || '',
+        level: level || 'info',
+        read: false,
+        readAt: null,
+        senderOpenid: 'system',
+        senderName: '图书馆',
+        createdAt: db.serverDate()
+      }
+    });
+  } catch (e) {
+    console.error('[borrowManager] 站内通知写入失败', type, toOpenid, (e && e.errCode) || e);
+  }
+}
+
 /** 管理员手动发送「逾期提醒」给借阅人（新模板 OVERDUE_REMIND，需借阅人此前已授权，可多次授权累加次数）
  *  thing1=书籍名称，short_thing4=逾期天数，thing5=固定文案「你借出书籍已逾期，请尽快提交还书订单」
  *  失败 43101 表示用户未订阅/次数用尽，返回明确提示由前端转达。
@@ -583,6 +616,15 @@ async function doSendOverdueRemind(event = {}) {
   if (!record.userId) return { ok: false, msg: '该记录缺少借阅人信息' };
   const due = new Date(record.dueDate);
   const days = Math.max(0, Math.ceil((Date.now() - due.getTime()) / 86400000));
+  // 无论订阅消息是否成功，先写一条站内通知（订阅额度可能已用完）
+  await pushNotice(
+    record.userId,
+    'overdue',
+    `《${record.bookTitle || '图书'}》已逾期 ${days} 天`,
+    '请尽快提交还书申请，逾期会影响信用',
+    '/pages/my/borrows/index',
+    'danger'
+  );
   try {
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
@@ -751,6 +793,17 @@ async function doAuditCard(event, pass) {
     })
   };
   await db.collection('users').doc(userId).update({ data: patch });
+  // 审批结果通知（站内 + 用户打开「我的」即可看到原因）
+  await pushNotice(
+    u.openid,
+    'card',
+    pass ? '借书证已开通' : '借书证申请被驳回',
+    pass
+      ? `归属馆藏：${(u.card && u.card.location) || '未设置'}，现在可以借阅该馆藏的图书了`
+      : `原因：${patch.card.rejectReason}，可修改资料后重新申请`,
+    '/pages/my/index',
+    pass ? 'info' : 'warning'
+  );
   return { ok: true };
 }
 
