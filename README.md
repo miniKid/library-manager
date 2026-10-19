@@ -57,13 +57,26 @@
 
 7. 左侧文件树右键 `cloudfunctions` → 「当前环境」选中你的环境，然后逐个右键「上传并部署：云端安装依赖」：
    `login`、`initDB`、`lookupBook`、`borrowManager`、`notify`、`notifyManager`、`reviewManager`、`insightManager`
-8. （可选）给 `borrowManager` / `notify` 配环境变量，换配置不用改代码、不用重新部署：
+8. （可选）配置订阅消息模板与少量环境变量：
 
-   | 变量 | 作用 | 默认 |
+   | 配置项 | 作用 | 默认 |
    |---|---|---|
-   | `MP_STATE` | 订阅消息点击后跳转的版本：`formal` 正式 / `trial` 体验 / `developer` 开发 | `formal` |
-   | `ADMIN_OPENID` | 指定初始管理员（也可在管理端「设置」页改 `settings.global.adminOpenid`，集合值优先） | 空 = 首个登录用户当管理员 |
-   | `TMPL_BORROW_OK` / `TMPL_RETURN_REMIND` / `TMPL_OVERDUE_REMIND` | 三个订阅消息模板 ID | 仓库内置的示例模板 |
+   | `settings.global.templates` | 三个订阅消息模板的 **ID + 字段映射**（结构见下）；放在数据库里，可在云开发控制台或管理端「设置」页直接改，换模板/换小程序不必改代码、不必重新部署 | 仓库内置示例模板（上线前替换为自己在「订阅消息」申请的真实模板） |
+   | `MP_STATE`（云函数环境变量） | 订阅消息点击后跳转的版本：`formal` 正式 / `trial` 体验 / `developer` 开发 | `formal` |
+   | `ADMIN_OPENID`（云函数环境变量） | 指定初始管理员（也可在管理端「设置」页改 `settings.global.adminOpenid`，集合值优先） | 空 = 首个登录用户当管理员 |
+
+   `MP_STATE` 是真正的「环境切换」，仍用云函数环境变量；模板 ID 与字段映射已数据化到 `settings.global.templates`。该字段结构（`settings` 集合 `_id: global` 文档内）：
+
+   ```json
+   "templates": {
+     "borrowOk":      { "templateId": "...", "fields": { "thing1": "bookTitle", "time5": "deliverDate", "time3": "dueDateFull" } },
+     "returnRemind":  { "templateId": "...", "fields": { "date1": "dueDate", "thing3": "bookTitle", "number2": "bookId", "thing4": "dueStatus" } },
+     "overdueRemind": { "templateId": "...", "fields": { "thing1": "bookTitle", "short_thing4": "overdueDays", "thing5": "overdueTip" } }
+   }
+   ```
+
+   - `fields` 的 **key** 是模板关键词（随你在公众平台选的模板而定，配错会报 `47003`），**value** 是取值器名：`bookTitle` / `bookId` / `deliverDate` / `dueDate` / `dueDateFull` / `dueStatus` / `overdueDays` / `overdueTip`。
+   - 不同小程序、或你的模板关键词与示例不一致时，**只改 `settings` 里的 `templates` 即可**，无需改 `borrowManager` / `notify` 代码；首次运行 `initDB` 会自动写入这份默认配置。
 
 9. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次，写入种子图书与全局设置。
 
@@ -146,8 +159,8 @@
 |---|---|---|
 | `login` | openid 换取用户；`settings.adminOpenid` / `ADMIN_OPENID` 为空时首个用户为管理员 | — |
 | `initDB` | 建集合、写全局设置与种子图书（幂等） | 手动执行一次 |
-| `borrowManager` | 借阅全流程、逾期提醒、借书证审批、图书增删改、管理端借阅查询（`adminBorrows` / `bookBorrows`） | `subscribeMessage.send`；环境变量 `MP_STATE`、`ADMIN_OPENID`、`TMPL_*` |
-| `notify` | 每天 9:00 扫描到期/逾期，发订阅消息 + 写站内通知，清理 90 天前通知 | timer `0 0 9 * * *`、`subscribeMessage.send`；环境变量 `MP_STATE`、`TMPL_RETURN_REMIND` |
+| `borrowManager` | 借阅全流程、逾期提醒、借书证审批、图书增删改、管理端借阅查询（`adminBorrows` / `bookBorrows`） | `subscribeMessage.send`；模板见 `settings.global.templates`；环境变量 `MP_STATE`、`ADMIN_OPENID` |
+| `notify` | 每天 9:00 扫描到期/逾期，发订阅消息 + 写站内通知，清理 90 天前通知 | timer `0 0 9 * * *`、`subscribeMessage.send`；模板见 `settings.global.templates`；环境变量 `MP_STATE` |
 | `notifyManager` | 通知列表/已读/偏好、待办 CRUD、管理员群发与发送记录 | — |
 | `reviewManager` | 书评列表/提交/编辑/删除、点赞、审核、回复（回复会通知作者） | — |
 | `insightManager` | 用户统计、书籍统计、CSV 导出、推荐打分 | — |

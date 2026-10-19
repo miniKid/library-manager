@@ -20,13 +20,69 @@ const BORROW_STATUS = {
 };
 const ROLE = { ADMIN: 'admin', USER: 'user' };
 
-// 订阅消息模板 ID（与公众平台「订阅消息」中创建的一致，均为一次性订阅）
-// 允许用云函数环境变量覆盖：换模板时不必改代码、重新部署，控制台改配置即可
-const TMPL = {
-  BORROW_OK: process.env.TMPL_BORROW_OK || 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4', // 借阅成功通知
-  RETURN_REMIND: process.env.TMPL_RETURN_REMIND || 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
-  OVERDUE_REMIND: process.env.TMPL_OVERDUE_REMIND || 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo' // 逾期提醒（管理员手动触发）
+// 订阅消息模板配置：模板 ID 与「关键词 -> 取值器」字段映射一并放在 settings.global.templates，
+// 运行时读取，可在云开发控制台或管理端「设置」页直接改，换模板/换小程序都不必改代码、不必重新部署。
+// 仅当 settings 未配置时才回落到仓库内置的示例模板（保证开箱即跑；上线前请替换成自己在「订阅消息」申请的真实模板）。
+// 关键词名（thing1/time5…）随模板走，因此是数据；但取值通常要计算（逾期天数、日期格式），故取值逻辑留在代码里。
+const DEFAULT_TEMPLATES = {
+  borrowOk: {
+    templateId: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4', // 借阅成功通知
+    fields: { thing1: 'bookTitle', time5: 'deliverDate', time3: 'dueDateFull' }
+  },
+  returnRemind: {
+    templateId: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
+    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'bookId', thing4: 'dueStatus' }
+  },
+  overdueRemind: {
+    templateId: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo', // 逾期提醒（管理员手动触发）
+    fields: { thing1: 'bookTitle', short_thing4: 'overdueDays', thing5: 'overdueTip' }
+  }
 };
+
+/** 取值器：把取值器名解析为发送给订阅消息的字符串值（值多需计算，故留在代码；关键词名数据化） */
+function resolveTmplValue(name, ctx) {
+  const r = ctx.record || {};
+  switch (name) {
+    case 'bookTitle':
+      return String(r.bookTitle || '图书').slice(0, 20);
+    case 'bookId':
+      return r.bookId || '';
+    case 'deliverDate':
+      return formatDate(r.deliverDate);
+    case 'dueDate':
+      return formatDate(r.dueDate);
+    case 'dueDateFull':
+      return formatCST(r.dueDate);
+    case 'dueStatus':
+      return new Date(r.dueDate) < new Date() ? '已逾期' : '即将到期';
+    case 'overdueDays':
+      return String(ctx.days != null ? ctx.days : 0);
+    case 'overdueTip':
+      return '你借出书籍已逾期，请尽快提交还书订单';
+    default:
+      return '';
+  }
+}
+
+/** 合并 settings.templates 与默认：settings 缺哪块就用默认，便于增量升级 */
+function getTemplate(settings, name) {
+  const def = DEFAULT_TEMPLATES[name] || { templateId: '', fields: {} };
+  const cfg = ((settings || {}).templates || {})[name] || {};
+  return {
+    templateId: cfg.templateId || def.templateId,
+    fields: cfg.fields || def.fields
+  };
+}
+
+/** 按模板 fields 把取值器结果组装成 subscribeMessage.send 的 data */
+function buildTmplData(tpl, ctx) {
+  const data = {};
+  const fields = (tpl || {}).fields || {};
+  Object.keys(fields).forEach((kw) => {
+    data[kw] = { value: String(resolveTmplValue(fields[kw], ctx)) };
+  });
+  return data;
+}
 // 订阅消息点击后的跳转版本：默认 'formal'（正式版）；
 // 开发/体验阶段在云函数环境变量里配 MP_STATE=developer / trial，不要写死在代码里，
 // 否则上线后用户点消息会提示「小程序不存在」。
@@ -563,19 +619,17 @@ function cstTodayStr() { return formatCST(new Date(), false); }
 async function sendBorrowOk(record) {
   if (!record || !record.userId) return;
   try {
+    const settings = await getSettings();
+    const tpl = getTemplate(settings, 'borrowOk');
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
-      templateId: TMPL.BORROW_OK,
+      templateId: tpl.templateId,
       page: 'pages/my/index',            // 点击消息进入「我的」页
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
-      // 字段名需与模板关键词一致（thing1/date2…），否则报 47003
-      data: {
-        thing1: { value: String(record.bookTitle || '图书').slice(0, 20) },
-        time5: { value: formatDate(record.deliverDate) },
-        time3: { value: formatCST(record.dueDate) },
-        // phrase4: { value: '借阅成功' }
-      }
+      // 字段名（thing1/time5/time3…）与取值来自 settings.global.templates.borrowOk，
+      // 关键词与你的模板不一致时改 settings 即可，不必改代码
+      data: buildTmplData(tpl, { record })
     });
   } catch (e) {
     console.error('[borrowManager] 借阅成功通知发送失败', record._id, (e && e.errCode) || e);
@@ -633,18 +687,16 @@ async function doSendOverdueRemind(event = {}) {
     'danger'
   );
   try {
+    const settings = await getSettings();
+    const tpl = getTemplate(settings, 'overdueRemind');
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
-      templateId: TMPL.OVERDUE_REMIND,
+      templateId: tpl.templateId,
       page: 'pages/my/index',            // 点击消息进入「我的」页
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
-      // 字段名需与模板关键词一致（thing1/short_thing4/thing5），否则报 47003
-      data: {
-        thing1: { value: String(record.bookTitle || '图书').slice(0, 20) },
-        short_thing4: { value: String(days) },
-        thing5: { value: '你借出书籍已逾期，请尽快提交还书订单' }
-      }
+      // 字段名（thing1/short_thing4/thing5…）与取值来自 settings.global.templates.overdueRemind
+      data: buildTmplData(tpl, { record, days })
     });
     return { ok: true };
   } catch (e) {

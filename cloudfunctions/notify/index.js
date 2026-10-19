@@ -14,10 +14,63 @@ const db = cloud.database();
 const _ = db.command;
 
 const BORROW_STATUS = { BORROWING: 'borrowing' };
-const TMPL_RETURN_REMIND =
-  process.env.TMPL_RETURN_REMIND || 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM';
-// 订阅消息跳转版本：默认正式版，开发阶段用云函数环境变量 MP_STATE=developer / trial 覆盖
+// 订阅消息跳转版本：默认正式版；开发/体验阶段用云函数环境变量 MP_STATE=developer / trial 覆盖
+// （MP_STATE 是真正的「环境切换」，保留为环境变量；模板 ID 与字段映射见下方 DEFAULT_TEMPLATES / settings.global.templates）
 const MP_STATE = process.env.MP_STATE || 'formal';
+
+// 订阅消息「到期提醒」模板配置：ID 与字段映射放在 settings.global.templates.returnRemind，运行时读取，
+// 换模板/换小程序在控制台或管理端改即可，不必重新部署。未配置时回落到仓库内置示例模板。
+const DEFAULT_TEMPLATES = {
+  returnRemind: {
+    templateId: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM',
+    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'bookId', thing4: 'dueStatus' }
+  }
+};
+
+/** 取值器：把取值器名解析为发送字符串（值需计算，故留代码；关键词名随模板数据化） */
+function resolveTmplValue(name, ctx) {
+  const r = ctx.record || {};
+  switch (name) {
+    case 'bookTitle':
+      return String(r.bookTitle || '图书').slice(0, 20);
+    case 'bookId':
+      return r.bookId || '';
+    case 'dueDate':
+      return formatDate(r.dueDate);
+    case 'dueStatus':
+      return new Date(r.dueDate) < new Date() ? '已逾期' : '即将到期';
+    default:
+      return '';
+  }
+}
+
+function getTemplate(settings, name) {
+  const def = DEFAULT_TEMPLATES[name] || { templateId: '', fields: {} };
+  const cfg = ((settings || {}).templates || {})[name] || {};
+  return {
+    templateId: cfg.templateId || def.templateId,
+    fields: cfg.fields || def.fields
+  };
+}
+
+function buildTmplData(tpl, ctx) {
+  const data = {};
+  const fields = (tpl || {}).fields || {};
+  Object.keys(fields).forEach((kw) => {
+    data[kw] = { value: String(resolveTmplValue(fields[kw], ctx)) };
+  });
+  return data;
+}
+
+/** 读全局设置（含 templates），失败回落空对象，由默认模板兜底 */
+async function getSettings() {
+  try {
+    const res = await db.collection('settings').doc('global').get();
+    return res.data || {};
+  } catch (e) {
+    return {};
+  }
+}
 
 const NOTICE = 'notifications';
 const KEEP_DAYS = 90;
@@ -77,21 +130,16 @@ async function pushInApp(record, type, title, content, bizId) {
 }
 
 /** 推送「图书到期提醒」；失败（含 43101 未授权）时标记 reminded 避免反复重试 */
-async function sendReturnRemind(record) {
+async function sendReturnRemind(record, tpl) {
   try {
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
-      templateId: TMPL_RETURN_REMIND,
+      templateId: tpl.templateId,
       page: 'pages/my/borrows/index',
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
-      // 字段名需与模板关键词一致（thing1/date2…），否则报 47003
-      data: {
-        date1: { value: formatDate(record.dueDate) },
-        thing3: { value: String(record.bookTitle || '图书').slice(0, 20) },
-        number2: { value: record.bookId || '' },
-        thing4: { value: new Date(record.dueDate) < new Date() ? '已逾期' : '即将到期' }
-      }
+      // 字段名（date1/thing3/number2/thing4…）与取值来自 settings.global.templates.returnRemind
+      data: buildTmplData(tpl, { record })
     });
     await db.collection('borrows').doc(record._id).update({ data: { reminded: true } });
   } catch (e) {
@@ -124,6 +172,8 @@ async function cleanupOldNotices() {
 
 exports.main = async () => {
   const in3Days = new Date(Date.now() + 3 * 86400000);
+  // 一次性读取模板配置（含到期提醒），避免循环内反复查库
+  const returnTpl = getTemplate(await getSettings(), 'returnRemind');
 
   // 1) 订阅消息：仅处理曾授权且未提醒过的记录
   const subRes = await db
@@ -137,7 +187,7 @@ exports.main = async () => {
     .limit(100)
     .get();
   for (const r of subRes.data) {
-    await sendReturnRemind(r);
+    await sendReturnRemind(r, returnTpl);
   }
 
   // 2) 站内通知：不依赖订阅授权（含未授权用户）

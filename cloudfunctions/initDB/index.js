@@ -10,6 +10,23 @@ const db = cloud.database();
 
 const DEFAULT_LOCATIONS = ['广州', '西安'];
 
+// 订阅消息模板默认配置（ID + 字段映射）。仅当 settings.global.templates 未配置时回落；
+// 上线前请替换成自己在公众平台「订阅消息」申请的真实模板，或部署后在控制台/管理端改。
+const DEFAULT_TEMPLATES = {
+  borrowOk: {
+    templateId: 'gZphulGBNq3xfluQHwHT52nAyhZcU8G5J_QvJlbzQE4', // 借阅成功通知
+    fields: { thing1: 'bookTitle', time5: 'deliverDate', time3: 'dueDateFull' }
+  },
+  returnRemind: {
+    templateId: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
+    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'bookId', thing4: 'dueStatus' }
+  },
+  overdueRemind: {
+    templateId: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo', // 逾期提醒（管理员手动触发）
+    fields: { thing1: 'bookTitle', short_thing4: 'overdueDays', thing5: 'overdueTip' }
+  }
+};
+
 /** 把总库存随机分配到各地点 */
 function randomStocks(total) {
   const stocks = {};
@@ -84,6 +101,38 @@ exports.main = async () => {
         .collection('settings')
         .doc('global')
         .update({ data: { adminOpenid: process.env.ADMIN_OPENID || '' } });
+    }
+  } catch (e) {}
+
+  // 确保 settings 含 templates（订阅消息模板的 ID 与字段映射；可在控制台/管理端改，免重新部署）
+  try {
+    const sDoc = await db.collection('settings').doc('global').get();
+    const data = sDoc.data || {};
+    if (!data.templates) {
+      // 首次：整体写入默认模板
+      await db
+        .collection('settings')
+        .doc('global')
+        .update({ data: { templates: DEFAULT_TEMPLATES } });
+    } else {
+      // 已存在：增量补齐缺失的模板/字段（升级用），不覆盖用户已改过的值
+      let changed = false;
+      const next = Object.assign({}, data.templates);
+      Object.keys(DEFAULT_TEMPLATES).forEach((k) => {
+        if (!next[k]) {
+          next[k] = DEFAULT_TEMPLATES[k];
+          changed = true;
+        } else {
+          if (!next[k].templateId) { next[k].templateId = DEFAULT_TEMPLATES[k].templateId; changed = true; }
+          if (!next[k].fields) { next[k].fields = DEFAULT_TEMPLATES[k].fields; changed = true; }
+        }
+      });
+      if (changed) {
+        await db
+          .collection('settings')
+          .doc('global')
+          .update({ data: { templates: next } });
+      }
     }
   } catch (e) {}
 
