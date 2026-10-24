@@ -142,6 +142,7 @@ async function sendReturnRemind(record, tpl) {
       data: buildTmplData(tpl, { record })
     });
     await db.collection('borrows').doc(record._id).update({ data: { reminded: true } });
+    console.log('[notify] 订阅消息已发送', record._id, 'templateId:', tpl.templateId);
   } catch (e) {
     const code = (e && e.errCode) || (e && e.code);
     console.error('[notify] 订阅消息发送失败', record._id, code || e);
