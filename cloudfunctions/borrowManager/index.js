@@ -716,9 +716,10 @@ async function doMyBorrows(openid) {
     .collection('borrows')
     .where({ userId: openid })
     .orderBy('borrowDate', 'desc')
+    // 临时限制 100 条：当前「我的借阅」页只展示近期记录，暂不实现分页。
+    // 注意：此处无 skip / page，借阅记录超过 100 条时更早的记录会被静默截断；
+    // 若将来需要翻看更早记录，再补 page/skip 或按 borrowDate 游标翻页。
     .limit(100)
-    // 不回传 bookCover：历史记录里存过 base64 封面副本，纯冗余且撑大响应体
-    .field({ bookCover: false })
     .get();
   return res.data.map((r) => {
     const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
@@ -735,7 +736,7 @@ async function doMyBorrows(openid) {
   });
 }
 
-/** 借阅记录的对外形态：派生逾期状态 + 页面直接可用的文案；不回传 bookCover（历史冗余字段） */
+/** 借阅记录的对外形态：派生逾期状态 + 页面直接可用的文案 */
 function decorateBorrow(r) {
   // 注意：逾期是派生值，不落库；BORROW_STATUS 里没有 OVERDUE 键，必须用字面量
   const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && cstDateStr(r.dueDate) < cstTodayStr();
@@ -749,7 +750,6 @@ function decorateBorrow(r) {
     scheduledPickupDateText: r.scheduledPickupDate || '',
     scheduledReturnDateText: r.scheduledReturnDate || ''
   };
-  delete out.bookCover;
   return out;
 }
 
@@ -770,7 +770,6 @@ async function doAdminBorrows(event = {}) {
     .where(where)
     .orderBy('borrowDate', 'desc')
     .limit(size)
-    .field({ bookCover: false })
     .get();
   let list = res.data;
   if (status === 'overdue') {
@@ -791,7 +790,6 @@ async function doBookBorrows(event = {}) {
     .where({ bookId })
     .orderBy('borrowDate', 'desc')
     .limit(size)
-    .field({ bookCover: false })
     .get();
   return { ok: true, data: res.data.map(decorateBorrow) };
 }

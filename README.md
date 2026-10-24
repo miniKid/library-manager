@@ -151,7 +151,7 @@
 >
 > 权限的唯一事实来源是 [`database.rules.json`](database.rules.json)，改权限时请同步改它，不要在控制台手点完就完事。
 >
-> 借阅记录**不再存 `bookCover`**：早期每条记录都会复制一份 ≤40KB 的 base64 封面（UI 从未使用），现在写入端已去掉，存量数据用 `scripts/oneoff/dbMaintenance` 清（见 [scripts/README.md](scripts/README.md)）。
+> 借阅记录**不再存 `bookCover`**：早期每条记录都会复制一份 ≤40KB 的 base64 封面（UI 从未使用），现在写入端已去掉；存量字段由 `scripts/oneoff/dbMaintenance` 清，`initDB` 每次运行也会幂等顺带删除（见 [scripts/README.md](scripts/README.md)）。读取端（`borrowManager` / `mock`）不再做任何剔除。
 
 ## 云函数一览
 

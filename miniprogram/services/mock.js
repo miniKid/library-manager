@@ -789,18 +789,6 @@ async function cancelReturn(borrowId, profile) {
   return { ok: true };
 }
 
-/**
- * 剔除借阅记录里的历史冗余字段 bookCover。
- * 早期每条借阅记录会复制一份 ≤40KB 的 base64 封面，UI 从未使用；
- * 新记录不再写入，存量数据在出口统一丢掉（云端用 field 投影排除）。
- */
-function withoutBookCover(record) {
-  if (!record || typeof record !== 'object') return record;
-  const copy = Object.assign({}, record);
-  delete copy.bookCover;
-  return copy;
-}
-
 /** 我的借阅 */
 async function getMyBorrows(profile) {
   const db = getDb();
@@ -809,7 +797,7 @@ async function getMyBorrows(profile) {
     .filter((r) => r.userId === user.openid)
     .sort((a, b) => new Date(b.borrowDate) - new Date(a.borrowDate))
     .map((r) => ({
-      ...withoutBookCover(r),
+      ...r,
       borrowDateText: formatDate(r.borrowDate),
       deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
       dueDateText: formatCST(r.dueDate),
@@ -850,7 +838,7 @@ async function getBorrows({ status = '' } = {}) {
   return list
     .sort((a, b) => new Date(b.borrowDate) - new Date(a.borrowDate))
     .map((r) => ({
-      ...withoutBookCover(r),
+      ...r,
       borrowDateText: formatDate(r.borrowDate),
       deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',
       dueDateText: formatCST(r.dueDate),
@@ -890,7 +878,7 @@ async function getBorrowsByBook(bookId) {
     .map((r) => {
       const overdue = r.status === BORROW_STATUS.BORROWING && r.dueDate && new Date(r.dueDate).getTime() < now;
       return {
-        ...withoutBookCover(r),
+        ...r,
         status: overdue ? BORROW_STATUS.OVERDUE : r.status,
         borrowDateText: formatDate(r.borrowDate),
         deliverDateText: r.deliverDate ? formatDate(r.deliverDate) : '',

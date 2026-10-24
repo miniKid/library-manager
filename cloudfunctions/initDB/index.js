@@ -7,6 +7,7 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;
 
 const DEFAULT_LOCATIONS = ['广州', '西安'];
 
@@ -134,6 +135,15 @@ exports.main = async () => {
           .update({ data: { templates: next } });
       }
     }
+  } catch (e) {}
+
+  // 清理历史冗余字段 bookCover：早期每条借阅记录复制过 base64 封面副本（UI 从未使用），
+  // 写入端早已不存储，此处幂等删除仍残留的字段；大批量历史数据可用 scripts/oneoff/dbMaintenance 的 cleanBorrowCover
+  try {
+    await db
+      .collection('borrows')
+      .where({ bookCover: _.exists(true) })
+      .update({ data: { bookCover: _.remove() } });
   } catch (e) {}
 
   const countRes = await db.collection('books').count();

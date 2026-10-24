@@ -148,18 +148,17 @@ test('借阅页签计数：各状态数量与列表条数一致，逾期为借�
   assert.ok(overdueList.length <= borrowingList.length, '逾期是借出中的子集，不应多于借出中');
 });
 
-test('借阅记录不再携带 bookCover：存量字段在出口被剔除', async () => {
+test('借阅记录不再携带 bookCover：写入端不存储、读取端不返回', async () => {
   resetDb();
   const me = await mock.login({ nickname: '管理员' });
   const db = rawDb();
   const book = db.books[0];
-  // 模拟存量记录：早期写入过 base64 封面副本
+  // 正常借阅记录：写入端不再写入 bookCover（早期冗余副本由 dbMaintenance 清理存量）
   db.borrows = [
     {
-      _id: 'legacy1',
+      _id: 'b1',
       bookId: book._id,
       bookTitle: book.title,
-      bookCover: 'data:image/jpeg;base64,AAAA',
       userId: me.openid,
       userName: me.nickname,
       location: '广州',
@@ -172,11 +171,11 @@ test('借阅记录不再携带 bookCover：存量字段在出口被剔除', asyn
 
   const has = (o) => Object.prototype.hasOwnProperty.call(o, 'bookCover');
   const adminList = await mock.getBorrows({});
-  assert.ok(adminList.length === 1 && !has(adminList[0]), '管理端列表应剔除 bookCover');
+  assert.ok(adminList.length === 1 && !has(adminList[0]), '管理端列表不应返回 bookCover');
   const mine = await mock.getMyBorrows({ nickname: '管理员' });
-  assert.ok(mine.length === 1 && !has(mine[0]), '我的借阅应剔除 bookCover');
+  assert.ok(mine.length === 1 && !has(mine[0]), '我的借阅不应返回 bookCover');
   const byBook = await mock.getBorrowsByBook(book._id);
-  assert.ok(byBook.length === 1 && !has(byBook[0]), '图书借阅记录应剔除 bookCover');
+  assert.ok(byBook.length === 1 && !has(byBook[0]), '图书借阅记录不应返回 bookCover');
 });
 
 /* ------------------------------- 统计与导出 ------------------------------- */
