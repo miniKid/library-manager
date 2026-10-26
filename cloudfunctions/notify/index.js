@@ -23,7 +23,7 @@ const MP_STATE = process.env.MP_STATE || 'formal';
 const DEFAULT_TEMPLATES = {
   returnRemind: {
     templateId: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM',
-    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'bookId', thing4: 'dueStatus' }
+    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'dueCount', thing4: 'dueTip' }
   }
 };
 
@@ -33,12 +33,12 @@ function resolveTmplValue(name, ctx) {
   switch (name) {
     case 'bookTitle':
       return String(r.bookTitle || '图书').slice(0, 20);
-    case 'bookId':
-      return r.bookId || '';
     case 'dueDate':
       return formatDate(r.dueDate);
-    case 'dueStatus':
-      return new Date(r.dueDate) < new Date() ? '已逾期' : '即将到期';
+    case 'dueCount':
+      return 1; // 单条借阅对应 1 本；模板 number2 为数字类型，必须为数值
+    case 'dueTip':
+      return '请于到期前归还或续借，避免逾期'; // 模板 thing4 为 thing 类型，≤20 字
     default:
       return '';
   }

@@ -70,12 +70,12 @@
    ```json
    "templates": {
      "borrowOk":      { "templateId": "...", "fields": { "thing1": "bookTitle", "time5": "deliverDate", "time3": "dueDateFull" } },
-     "returnRemind":  { "templateId": "...", "fields": { "date1": "dueDate", "thing3": "bookTitle", "number2": "bookId", "thing4": "dueStatus" } },
+     "returnRemind":  { "templateId": "...", "fields": { "date1": "dueDate", "thing3": "bookTitle", "number2": "dueCount", "thing4": "dueTip" } },
      "overdueRemind": { "templateId": "...", "fields": { "thing1": "bookTitle", "short_thing4": "overdueDays", "thing5": "overdueTip" } }
    }
    ```
 
-   - `fields` 的 **key** 是模板关键词（随你在公众平台选的模板而定，配错会报 `47003`），**value** 是取值器名：`bookTitle` / `bookId` / `deliverDate` / `dueDate` / `dueDateFull` / `dueStatus` / `overdueDays` / `overdueTip`。
+   - `fields` 的 **key** 是模板关键词（随你在公众平台选的模板而定，配错会报 `47003`），**value** 是取值器名：`bookTitle` / `deliverDate` / `dueDate` / `dueDateFull` / `dueCount` / `dueTip` / `overdueDays` / `overdueTip`。其中 `number2` 是**数字类型**，只能填数值（`dueCount` 默认 `1`），不能填 `bookId` 这类字符串，否则报 `47003`；`thing` 类型关键词（如 `thing3`/`thing4`）上限 20 字，`dueTip` 已按此截断。
    - 不同小程序、或你的模板关键词与示例不一致时，**只改 `settings` 里的 `templates` 即可**，无需改 `borrowManager` / `notify` 代码；首次运行 `initDB` 会自动写入这份默认配置。
 
 9. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次，写入种子图书与全局设置。
