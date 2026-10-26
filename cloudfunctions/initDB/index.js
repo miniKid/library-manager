@@ -20,7 +20,7 @@ const DEFAULT_TEMPLATES = {
   },
   returnRemind: {
     templateId: 'opgxSjtbN8zWIerXYN8fphLzfHmGwhXY13swG9tdBTM', // 图书到期提醒（定时）
-    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'bookId', thing4: 'dueStatus' }
+    fields: { date1: 'dueDate', thing3: 'bookTitle', number2: 'dueCount', thing4: 'dueTip' }
   },
   overdueRemind: {
     templateId: 'FAPXsyLsQ-cpHvgphgx8eNH-3YJQT2JHM7NwLYRtQmo', // 逾期提醒（管理员手动触发）
@@ -128,6 +128,12 @@ exports.main = async () => {
           if (!next[k].fields) { next[k].fields = DEFAULT_TEMPLATES[k].fields; changed = true; }
         }
       });
+      // 升级兼容：旧默认把 number2 错配成 bookId（字符串），发给数字类型关键词会 47003；
+      // 若现有 returnRemind.fields 仍是该错误映射，用新默认覆盖（不影响其他自定义）
+      if (next.returnRemind && next.returnRemind.fields && next.returnRemind.fields.number2 === 'bookId') {
+        next.returnRemind.fields = DEFAULT_TEMPLATES.returnRemind.fields;
+        changed = true;
+      }
       if (changed) {
         await db
           .collection('settings')
