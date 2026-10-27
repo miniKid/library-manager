@@ -1,9 +1,0 @@
-{
-  "name": "fixBookCover",
-  "version": "1.0.0",
-  "description": "批量修复存量图书封面为 base64",
-  "main": "index.js",
-  "dependencies": {
-    "wx-server-sdk": "~2.6.3"
-  }
-}

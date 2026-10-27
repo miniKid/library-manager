@@ -21,18 +21,6 @@
       "installDependency": true
     },
     {
-      "name": "fixBookCover",
-      "timeout": 60,
-      "memorySize": 256,
-      "installDependency": true
-    },
-    {
-      "name": "migrateStocks",
-      "timeout": 60,
-      "memorySize": 256,
-      "installDependency": true
-    },
-    {
       "name": "borrowManager",
       "timeout": 30,
       "memorySize": 256,
