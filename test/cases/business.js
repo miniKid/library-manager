@@ -559,18 +559,19 @@ test('值班配置：单日覆盖优先于周规则，且保存后持久化', as
   const s0 = list.find((x) => x.location === loc);
   assert.deepStrictEqual(s0.weekly, [true, true, true, true, true, false, false], '默认周一至周五值班');
 
-  // 找一个周一（默认可选，改为不可选）与一个周六（默认不可选，改为可选）
-  const d = new Date();
-  let mon = null;
-  let sat = null;
-  for (let i = 1; i <= 60 && (!mon || !sat); i++) {
-    const t = util.addDays(d, i);
-    const wd = t.getDay();
-    const s = util.formatDate(t);
-    if (wd === 1 && !mon) mon = s;
-    if (wd === 6 && !sat) sat = s;
-  }
-  assert.ok(mon && sat, '60 天内应能找到周一与周六');
+  // 选一个固定参考月，在该月内找周一（默认可选，改为不可选）与周六（默认不可选，改为可选）。
+  // 不能从"今天起扫描 60 天"取：周一/周六可能落在不同月份，导致只按 mon 月份构建的月历里找不到 sat。
+  const firstDowInMonth = (year, month, dow) => {
+    const t = new Date(year, month - 1, 1);
+    for (let i = 0; i < 31; i++) {
+      if (t.getDay() === dow) return util.formatDate(t);
+      t.setDate(t.getDate() + 1);
+    }
+    return null;
+  };
+  const mon = firstDowInMonth(2026, 11, 1); // 周一
+  const sat = firstDowInMonth(2026, 11, 6); // 周六
+  assert.ok(mon && sat, '参考月内应能找到周一与周六');
 
   const save = await mock.saveSchedule({ location: loc, overrides: { [mon]: false, [sat]: true } });
   assert.strictEqual(save.ok, true);
@@ -937,7 +938,8 @@ test('非法状态不能取消：borrowing 不能取消借出申请 / pending �
 
 /** 取某 openid 用户（列表刷新后再取） */
 async function userByOpenid(openid) {
-  const list = await mock.getUsers();
+  const res = await mock.getUsers();
+  const list = (res && res.list) || [];
   return list.find((u) => u.openid === openid);
 }
 

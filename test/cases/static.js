@@ -82,6 +82,22 @@ test('静态检查：mock.js / cloud.js 的 exports 必须覆盖页面调用的�
   }
 });
 
+/** 收集 wxml 及其通过 <import src>/<include src> 引入的模板文件源码（用于 data- 属性联合校验） */
+function collectWxmlSources(wxmlPath, seen) {
+  seen = seen || new Set();
+  if (seen.has(wxmlPath)) return '';
+  seen.add(wxmlPath);
+  let src = '';
+  try { src = read(wxmlPath); } catch (e) { return ''; }
+  const baseDir = path.dirname(wxmlPath);
+  const importRe = /<(?:import|include)\s+src=["']([^"']+)["']/g;
+  let im;
+  while ((im = importRe.exec(src))) {
+    src += '\n' + collectWxmlSources(path.resolve(baseDir, im[1]), seen);
+  }
+  return src;
+}
+
 test('静态检查：WXML data- 属性与页面 JS 的 dataset 解构大小写一致（回归书名 undefined）', () => {
   const pairs = [];
   for (const wxml of walk(PAGES_DIR, '.wxml')) {
@@ -90,8 +106,9 @@ test('静态检查：WXML data- 属性与页面 JS 的 dataset 解构大小写�
   }
   assert.ok(pairs.length > 0, '应扫描到页面文件对');
   for (const { js, wxml } of pairs) {
-    const wsrc = read(wxml);
     const jsrc = read(js);
+    // 联合本文件与 <import>/<include> 引入的模板（如 my/index.wxml 引入的 borrow-item.wxml）一起收集 data- 属性
+    const wsrc = collectWxmlSources(wxml);
     const attrs = new Set();
     // 收集 WXML 中所有 data- 属性（含 data-field="isbn" 这类静态值，同样会进入 dataset）
     const re = /\bdata-([a-zA-Z0-9-]+)=/g;
@@ -301,7 +318,7 @@ test('静态检查：预约还书值班配置每次进入页面都刷新（回�
 
 test('静态检查：登录云函数初始化借书证——首个管理员默认开通第一馆藏卡，后续用户初始身份为空', () => {
   const loginJs = read(path.join(ROOT, 'cloudfunctions/login/index.js'));
-  const seg = loginJs.slice(loginJs.indexOf('const isAdmin'), loginJs.indexOf('return { user: doc }'));
+  const seg = loginJs.slice(loginJs.indexOf('const doc = {'), loginJs.indexOf('const addRes'));
   assert.ok(!/card:\s*isAdmin\s*\?\s*null/.test(seg),
     'login 云函数创建用户时不应再给管理员 null 卡（管理员为复合身份，须持卡借阅）');
   assert.ok(/card:\s*isAdmin\s*&&\s*firstLoc\s*\?/.test(seg),
