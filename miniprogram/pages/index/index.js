@@ -15,7 +15,8 @@ Page({
     loading: false,
     finished: false,
     logged: false,
-    recommends: []
+    recommends: [],
+    homePopup: null
   },
   timer: null,
 
@@ -65,7 +66,47 @@ Page({
     }
     // 每次回到页面都刷新，保证新增/编辑/删除/借还后书架数据同步
     this.loadBooks(true);
+    // 仅登录用户弹出首页公告（全局配置，但按需求只对登录态展示）
+    if (this.data.logged) this.loadPopup();
   },
+
+  /** 读取 settings.popup，命中（启用且版本未被本地关闭过）则弹窗 */
+  async loadPopup() {
+    if (this.data.homePopup) return;
+    try {
+      const settings = await services.getSettings();
+      const p = settings && settings.popup;
+      if (!p || !p.enabled) return;
+      const seen = wx.getStorageSync('homePopupSeenVersion') || 0;
+      if (Number(p.version) === Number(seen)) return;
+      this.setData({ homePopup: p });
+    } catch (e) {}
+  },
+
+  /** 关闭弹窗：记录已关闭版本，避免再次弹出 */
+  onPopupKnow() {
+    const p = this.data.homePopup;
+    if (p) wx.setStorageSync('homePopupSeenVersion', Number(p.version) || 0);
+    this.setData({ homePopup: null });
+  },
+
+  /** 查看详情：跳转链接后关闭并记录 */
+  onPopupDetail() {
+    const p = this.data.homePopup;
+    const link = p && p.link;
+    if (p) wx.setStorageSync('homePopupSeenVersion', Number(p.version) || 0);
+    this.setData({ homePopup: null });
+    if (link) wx.navigateTo({ url: link });
+  },
+
+  /** 图片海报点击放大预览 */
+  onPopupImageTap() {
+    const p = this.data.homePopup;
+    if (p && p.image) wx.previewImage({ urls: [p.image], current: p.image });
+  },
+
+  /** 阻止弹窗卡片点击穿透到遮罩层（关闭） */
+  noop() {},
 
   onKeywordInput(e) {
     this.setData({ keyword: e.detail.value });

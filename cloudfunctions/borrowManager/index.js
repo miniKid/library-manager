@@ -174,6 +174,8 @@ async function doSaveSettings(event, openid) {
   if (event.maxBorrow !== undefined) data.maxBorrow = Math.max(1, Number(event.maxBorrow) || 3);
   if (event.renewTimes !== undefined) data.renewTimes = Math.max(0, Number(event.renewTimes) || 0);
   if (event.renewDays !== undefined) data.renewDays = Math.max(1, Number(event.renewDays) || 15);
+  // 首页弹窗公告配置：整块由管理端写回（enabled/version/type/title/text/image/html/link/linkText）
+  if (event.popup !== undefined) data.popup = event.popup;
   await db.collection('settings').doc('global').set({ data });
   return { ok: true };
 }

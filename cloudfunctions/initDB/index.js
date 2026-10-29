@@ -129,6 +129,32 @@ exports.main = async () => {
     }
   } catch (e) {}
 
+  // 确保 settings 含 popup（首页弹窗公告配置；可在控制台/管理端改，免重新部署）
+  try {
+    const sDoc = await db.collection('settings').doc('global').get();
+    const data = sDoc.data || {};
+    if (data.popup === undefined) {
+      await db
+        .collection('settings')
+        .doc('global')
+        .update({
+          data: {
+            popup: {
+              enabled: false,
+              version: 1,
+              type: 'text',
+              title: '',
+              text: '',
+              image: '',
+              html: '',
+              link: '',
+              linkText: ''
+            }
+          }
+        });
+    }
+  } catch (e) {}
+
   // 清理历史冗余字段 bookCover：早期每条借阅记录复制过 base64 封面副本（UI 从未使用），
   // 写入端早已不存储，此处幂等删除仍残留的字段；大批量历史数据可用 scripts/oneoff/dbMaintenance 的 cleanBorrowCover
   try {

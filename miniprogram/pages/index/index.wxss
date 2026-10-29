@@ -162,3 +162,101 @@
 .rec-initial { color: #fff; font-size: 60rpx; font-weight: 600; }
 .rec-name { font-size: 25rpx; margin-top: 10rpx; }
 .rec-reason { font-size: 21rpx; color: var(--c-primary-2); margin-top: 4rpx; }
+
+/* ===== 首页弹窗公告 ===== */
+.popup-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+.popup-wrap {
+  width: 100%;
+  max-width: 620rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.popup-card {
+  width: 100%;
+  max-height: 72vh;
+  background: #fff;
+  border-radius: 32rpx;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.3);
+}
+.popup-card-text {
+  background: linear-gradient(165deg, #ffffff 0%, #eaf3fa 55%, #dfeef8 100%);
+  border-top: 6rpx solid #2B5B84;
+}
+.popup-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #222;
+  padding: 32rpx 32rpx 8rpx;
+}
+.popup-title-center {
+  text-align: center;
+  padding: 36rpx 32rpx 20rpx;
+  position: relative;
+}
+.popup-title-center::after {
+  content: '';
+  display: block;
+  width: 64rpx;
+  height: 6rpx;
+  border-radius: 6rpx;
+  background: linear-gradient(90deg, #4A8DB8, #2B5B84);
+  margin: 16rpx auto 0;
+}
+.popup-body {
+  flex: 1;
+  height: 58vh;
+  padding: 16rpx 32rpx;
+  box-sizing: border-box;
+}
+.popup-card-text .popup-body { text-align: center; }
+.popup-body-flush { padding: 0; }
+.popup-image { width: 100%; display: block; }
+.popup-text {
+  font-size: 28rpx;
+  color: #444;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 16rpx 0 32rpx;
+}
+.popup-cta {
+  margin-top: 36rpx;
+  width: 72%;
+  text-align: center;
+  padding: 24rpx 0;
+  border-radius: 52rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #fff;
+  background: linear-gradient(90deg, #4A8DB8, #2B5B84);
+  box-shadow: 0 10rpx 28rpx rgba(43, 91, 132, 0.45);
+}
+.popup-close {
+  margin-top: 30rpx;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  border: 2rpx solid rgba(255, 255, 255, 0.65);
+  color: #fff;
+  font-size: 30rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

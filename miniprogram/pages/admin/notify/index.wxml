@@ -1,5 +1,57 @@
 <view class="container">
   <view class="card">
+    <view class="section-title">首页弹窗公告<text class="tip">（登录用户打开首页时弹出；保存即更新，已关闭的用户会重新看到）</text></view>
+    <view class="form-item">
+      <text class="form-label">启用</text>
+      <switch checked="{{popup.enabled}}" bindchange="onPopupToggle" />
+    </view>
+    <view class="form-item">
+      <text class="form-label">类型</text>
+      <view class="scope-row">
+        <view wx:for="{{popupTypes}}" wx:key="value" class="chip {{popupTypeIndex === index ? 'chip-on' : ''}}" data-idx="{{index}}" bindtap="onPopupType">{{item.label}}</view>
+      </view>
+    </view>
+    <view class="form-item">
+      <text class="form-label">标题</text>
+      <input class="form-input" maxlength="30" placeholder="可选，最多30字" value="{{popup.title}}" data-field="title" bindinput="onPopupInput" />
+    </view>
+    <block wx:if="{{popup.type === 'text'}}">
+      <view class="form-item form-item-area">
+        <text class="form-label">文字内容</text>
+        <textarea class="form-area" maxlength="500" placeholder="纯文字公告内容" value="{{popup.text}}" data-field="text" bindinput="onPopupInput" />
+      </view>
+    </block>
+    <block wx:elif="{{popup.type === 'image'}}">
+      <view class="form-item form-item-area">
+        <text class="form-label">海报图片地址</text>
+        <textarea class="form-area" maxlength="2000" placeholder="图片 URL 或 cloud:// 文件ID" value="{{popup.image}}" data-field="image" bindinput="onPopupInput" />
+      </view>
+    </block>
+    <block wx:elif="{{popup.type === 'html'}}">
+      <view class="form-item form-item-area">
+        <text class="form-label">HTML 内容</text>
+        <textarea class="form-area" maxlength="20000" placeholder="<p>支持<b>富文本</b>与<img src='https://...'>（img 需 https 外链）</p>" value="{{popup.html}}" data-field="html" bindinput="onPopupInput" />
+      </view>
+    </block>
+    <view class="form-item">
+      <text class="form-label">点击跳转</text>
+      <picker class="form-value" range="{{popupLinks}}" range-key="label" value="{{popupLinkIndex}}" bindchange="onPopupLink">
+        <view class="picker-value">{{popupLinks[popupLinkIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">跳转键文字</text>
+      <input class="form-input" maxlength="8" placeholder="查看详情" value="{{popup.linkText}}" data-field="linkText" bindinput="onPopupInput" />
+    </view>
+    <button class="btn-primary send-btn" loading="{{savingPopup}}" bindtap="onSavePopup">保存弹窗配置</button>
+  </view>
+
+  <view class="card">
+    <view class="section-title">广播公告（发送通知）</view>
+    <view class="tip">向全部或指定馆藏用户推送公告；单次最多送达 500 人，公告类不可关闭。</view>
+  </view>
+
+  <view class="card">
     <view class="section-title">发送范围</view>
     <view class="scope-row">
       <view class="chip {{scope === 'all' ? 'chip-on' : ''}}" data-scope="all" bindtap="onScope">全部用户</view>
@@ -11,7 +63,6 @@
         <view class="picker-value">{{locations[locationIndex] || '请选择'}}</view>
       </picker>
     </view>
-    <view class="tip">单次最多送达 500 人；关闭了「公告」以外类型的用户不受影响，公告类不可关闭。</view>
   </view>
 
   <view class="card">

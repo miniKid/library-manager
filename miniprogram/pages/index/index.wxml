@@ -98,4 +98,20 @@
     <text>登录后可在线借阅图书</text>
     <text class="login-tip-btn">去登录</text>
   </view>
+
+  <!-- 首页弹窗公告 -->
+  <view wx:if="{{homePopup}}" class="popup-mask" catchtap="onPopupKnow" catchtouchmove="noop">
+    <view class="popup-wrap" catchtap="noop">
+      <view class="popup-card {{homePopup.type === 'text' ? 'popup-card-text' : ''}}">
+        <view wx:if="{{homePopup.title}}" class="popup-title popup-title-center">{{homePopup.title}}</view>
+        <scroll-view scroll-y class="popup-body {{homePopup.type === 'image' && !homePopup.title ? 'popup-body-flush' : ''}}">
+          <image wx:if="{{homePopup.type === 'image'}}" class="popup-image" src="{{homePopup.image}}" mode="widthFix" bindtap="onPopupImageTap" />
+          <rich-text wx:elif="{{homePopup.type === 'html'}}" nodes="{{homePopup.html}}"></rich-text>
+          <text wx:else class="popup-text">{{homePopup.text}}</text>
+        </scroll-view>
+      </view>
+      <view wx:if="{{homePopup.link}}" class="popup-cta" bindtap="onPopupDetail">{{homePopup.linkText || '查看详情'}}</view>
+      <view class="popup-close" bindtap="onPopupKnow">✕</view>
+    </view>
+  </view>
 </view>

@@ -18,7 +18,17 @@ Page({
     sending: false,
     history: [],
     total: 0,
-    loading: false
+    loading: false,
+    popup: { enabled: false, version: 1, type: 'text', title: '', text: '', image: '', html: '', link: '', linkText: '' },
+    popupTypes: [
+      { label: '纯文字', value: 'text' },
+      { label: '图片海报', value: 'image' },
+      { label: '富文本(HTML)', value: 'html' }
+    ],
+    popupTypeIndex: 0,
+    popupLinks: LINKS,
+    popupLinkIndex: 0,
+    savingPopup: false
   },
 
   onLoad() {
@@ -34,6 +44,13 @@ Page({
     }
     const settings = await services.getSettings();
     this.setData({ locations: (settings && settings.locations) || [] });
+    const p = (settings && settings.popup) || {};
+    const types = ['text', 'image', 'html'];
+    this.setData({
+      popup: Object.assign({ enabled: false, version: 1, type: 'text', title: '', text: '', image: '', html: '', link: '', linkText: '' }, p),
+      popupTypeIndex: Math.max(0, types.indexOf(p.type)),
+      popupLinkIndex: Math.max(0, LINKS.findIndex((l) => l.value === (p.link || '')))
+    });
     this.loadHistory();
   },
 
@@ -102,6 +119,44 @@ Page({
       this.loadHistory();
     } else {
       wx.showToast({ title: (res && res.msg) || '发送失败', icon: 'none' });
+    }
+  },
+
+  onPopupToggle(e) {
+    this.setData({ 'popup.enabled': e.detail.value });
+  },
+
+  onPopupType(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    this.setData({ popupTypeIndex: idx, 'popup.type': this.data.popupTypes[idx].value });
+  },
+
+  onPopupInput(e) {
+    this.setData({ ['popup.' + e.currentTarget.dataset.field]: e.detail.value });
+  },
+
+  onPopupLink(e) {
+    const idx = Number(e.detail.value);
+    this.setData({ popupLinkIndex: idx, 'popup.link': this.data.popupLinks[idx].value });
+  },
+
+  async onSavePopup() {
+    if (this.data.savingPopup) return;
+    const p = this.data.popup;
+    if (p.enabled) {
+      if (p.type === 'text' && !p.text.trim()) return wx.showToast({ title: '请填写文字内容', icon: 'none' });
+      if (p.type === 'image' && !p.image.trim()) return wx.showToast({ title: '请填写图片地址', icon: 'none' });
+      if (p.type === 'html' && !p.html.trim()) return wx.showToast({ title: '请填写 HTML 内容', icon: 'none' });
+    }
+    this.setData({ savingPopup: true });
+    const payload = Object.assign({}, p, { version: (Number(p.version) || 0) + 1 });
+    const res = await services.saveSettings({ popup: payload });
+    this.setData({ savingPopup: false });
+    if (res && res.ok) {
+      wx.showToast({ title: '已保存', icon: 'success' });
+      this.setData({ 'popup.version': payload.version });
+    } else {
+      wx.showToast({ title: (res && res.msg) || '保存失败', icon: 'none' });
     }
   }
 });
