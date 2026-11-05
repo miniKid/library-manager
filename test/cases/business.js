@@ -644,6 +644,28 @@ test('全局设置保存后可读回', async () => {
   assert.deepStrictEqual(s.locations, ['广州', '西安']);
 });
 
+test('首页弹窗公告配置保存后可读回（本地模拟模式不丢弃 popup）', async () => {
+  resetDb();
+  await mock.login({ nickname: '管理员' });
+  const popup = {
+    enabled: true,
+    version: 2,
+    type: 'text',
+    title: '开馆通知',
+    text: '本周六正常开放',
+    image: '',
+    html: '',
+    link: '/pages/my/index',
+    linkText: '去看看',
+    imageBase64: 'data:image/jpeg;base64,/9j/TEST'
+  };
+  const r = await mock.saveSettings({ popup });
+  assert.strictEqual(r.ok, true);
+  const s = await mock.getSettings();
+  assert.deepStrictEqual(s.popup, popup, 'popup 整块配置应完整持久化');
+  assert.strictEqual(s.popup.imageBase64, popup.imageBase64, 'base64 海报不能被丢弃');
+});
+
 test('月历工具：结构、范围、today 标记、值班标记正确', () => {
   const schedule = { weekly: [true, true, true, true, true, false, false], overrides: {} };
   const cal = sched.buildDateMonthCalendar(2026, 8, schedule, '2026-08-01', '2026-08-31');

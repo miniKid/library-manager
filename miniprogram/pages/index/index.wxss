@@ -196,6 +196,10 @@
   background: linear-gradient(165deg, #ffffff 0%, #eaf3fa 55%, #dfeef8 100%);
   border-top: 6rpx solid #2B5B84;
 }
+/* 图片海报：卡片不带白底，直接呈现图片 */
+.popup-card-image { background: transparent; box-shadow: none; }
+.popup-card-image .popup-title-center { color: #fff; }
+.popup-card-image .popup-title-center::after { background: linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0.6)); }
 .popup-title {
   font-size: 32rpx;
   font-weight: 600;
@@ -223,8 +227,17 @@
   box-sizing: border-box;
 }
 .popup-card-text .popup-body { text-align: center; }
-.popup-body-flush { padding: 0; }
-.popup-image { width: 100%; display: block; }
+/* 图片主体：固定高度内等比缩放完整显示，不产生滚动 */
+.popup-body-image {
+  flex: 1;
+  height: 58vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.popup-image { width: 100%; height: 100%; display: block; }
 .popup-text {
   font-size: 28rpx;
   color: #444;

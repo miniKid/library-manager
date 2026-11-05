@@ -158,6 +158,8 @@ async function saveSettings(data) {
   if (data.maxBorrow !== undefined) settings.maxBorrow = Number(data.maxBorrow) || 3;
   if (data.renewTimes !== undefined) settings.renewTimes = Math.max(0, Number(data.renewTimes) || 0);
   if (data.renewDays !== undefined) settings.renewDays = Math.max(1, Number(data.renewDays) || 1);
+  // 首页弹窗公告配置：整块写回，与云函数 borrowManager.saveSettings 保持一致
+  if (data.popup !== undefined) settings.popup = data.popup;
   syncSchedules(db);
   saveDb(db);
   return { ok: true };

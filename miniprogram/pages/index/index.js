@@ -1,6 +1,7 @@
 const services = require('../../services/index');
-const { hashColor } = require('../../utils/util');
-const { normalizeList } = require('../../utils/cover');
+const { hashColor, resolveCloudImage } = require('../../utils/util');
+const { normalizeList, toLocalFile } = require('../../utils/cover');
+const { normalizeNoticeLink } = require('../../utils/notice-links');
 
 Page({
   data: {
@@ -77,10 +78,29 @@ Page({
       const settings = await services.getSettings();
       const p = settings && settings.popup;
       if (!p || !p.enabled) return;
+      // 富文本类型已下线：存量 html 配置不再弹出，避免出现空白弹窗
+      if (p.type !== 'text' && p.type !== 'image') return;
       const seen = wx.getStorageSync('homePopupSeenVersion') || 0;
       if (Number(p.version) === Number(seen)) return;
-      this.setData({ homePopup: p });
-    } catch (e) {}
+      const link = normalizeNoticeLink(p.link);
+      let image = '';
+      if (p.type === 'image') {
+        console.log('[homePopup] 读取配置', { version: p.version, hasBase64: !!p.imageBase64, image: (p.image || '').slice(0, 60) });
+        // 优先用随配置入库的 base64，不依赖云存储权限（与 books.cover 同策略）
+        if (p.imageBase64) image = await toLocalFile(p.imageBase64, 'home_popup_' + (p.version || 0));
+        if (!image) image = await resolveCloudImage(p.image);
+        console.log('[homePopup] 最终图片地址', image);
+      }
+      this.setData({ homePopup: Object.assign({}, p, { link, image }) });
+    } catch (e) {
+      console.error('[homePopup] 加载失败', e);
+    }
+  },
+
+  /** 图片真正加载失败时给出可定位日志 */
+  onPopupImageError(e) {
+    const p = this.data.homePopup;
+    console.error('[homePopup] 图片加载失败', p && p.image, e && e.detail);
   },
 
   /** 关闭弹窗：记录已关闭版本，避免再次弹出 */
@@ -90,19 +110,38 @@ Page({
     this.setData({ homePopup: null });
   },
 
-  /** 查看详情：跳转链接后关闭并记录 */
+  /** 执行跳转：tabBar 页必须走 switchTab，失败时输出可定位日志 */
+  goPopupLink(link) {
+    const isTab = /^\/pages\/(index|admin|my)\/index$/.test(link);
+    if (isTab) {
+      wx.switchTab({ url: link, fail: (err) => console.error('[homePopup] switchTab 失败', link, err) });
+    } else {
+      wx.navigateTo({ url: link, fail: (err) => console.error('[homePopup] navigateTo 失败', link, err) });
+    }
+  },
+
+  /** 点击卡片 / 跳转键：无跳转目标时保持弹窗，不误关闭 */
   onPopupDetail() {
     const p = this.data.homePopup;
     const link = p && p.link;
-    if (p) wx.setStorageSync('homePopupSeenVersion', Number(p.version) || 0);
+    if (!link) return;
+    wx.setStorageSync('homePopupSeenVersion', Number(p.version) || 0);
     this.setData({ homePopup: null });
-    if (link) wx.navigateTo({ url: link });
+    this.goPopupLink(link);
   },
 
-  /** 图片海报点击放大预览 */
+  /** 图片海报：配置了跳转则点击直接跳转，否则放大预览 */
   onPopupImageTap() {
     const p = this.data.homePopup;
-    if (p && p.image) wx.previewImage({ urls: [p.image], current: p.image });
+    if (!p) return;
+    if (p.link) return this.onPopupDetail();
+    if (p.image) {
+      wx.previewImage({
+        urls: [p.image],
+        current: p.image,
+        fail: (err) => console.error('[homePopup] previewImage 失败', p.image, err)
+      });
+    }
   },
 
   /** 阻止弹窗卡片点击穿透到遮罩层（关闭） */
