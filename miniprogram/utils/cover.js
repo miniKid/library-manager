@@ -1,8 +1,9 @@
 /**
  * 封面 base64 dataURL 处理工具
  *
- * 微信小程序 <image> 组件的 src 支持：网络路径 / 本地路径 / 云文件ID，
- * 不支持直接渲染 base64 dataURL（真机显示空白）。
+ * 微信小程序 <image> 组件的 src 支持：网络路径 / 本地路径 / 本地临时路径，
+ * 不支持 base64 dataURL（真机显示空白）；cloud:// 文件 ID 同样不能直接使用，
+ * 会被当成相对路径拼接，需经 wx.cloud.downloadFile 或 getTempFileURL 转换（且依赖文件读权限）。
  * 因此 dataURL 封面必须先通过 FileSystemManager 写入本地用户目录，
  * 再用本地文件路径作为 image 的 src。
  */
@@ -78,4 +79,35 @@ async function normalizeList(list) {
   );
 }
 
-module.exports = { isDataUrl, toLocalFile, normalizeCover, normalizeList };
+/**
+ * 把本地图片等比压缩并转成 base64 dataURL，用于「不依赖云存储读权限」直接入库。
+ * 与 books.cover 同策略：入库存 dataURL，展示前再用 toLocalFile 写成本地文件。
+ */
+function imageToDataUrl(tempFilePath, maxW, maxH, quality) {
+  return new Promise((resolve, reject) => {
+    wx.getImageInfo({
+      src: tempFilePath,
+      success: (info) => {
+        try {
+          const scale = Math.min(maxW / info.width, maxH / info.height, 1);
+          const w = Math.max(1, Math.round(info.width * scale));
+          const h = Math.max(1, Math.round(info.height * scale));
+          const canvas = wx.createOffscreenCanvas({ type: '2d', width: w, height: h });
+          const ctx = canvas.getContext('2d');
+          const img = canvas.createImage();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = tempFilePath;
+        } catch (e) {
+          reject(e);
+        }
+      },
+      fail: reject
+    });
+  });
+}
+
+module.exports = { isDataUrl, toLocalFile, normalizeCover, normalizeList, imageToDataUrl };

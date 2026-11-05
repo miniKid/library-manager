@@ -146,7 +146,6 @@ exports.main = async () => {
               title: '',
               text: '',
               image: '',
-              html: '',
               link: '',
               linkText: ''
             }

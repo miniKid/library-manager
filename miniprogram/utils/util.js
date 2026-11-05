@@ -103,6 +103,24 @@ async function cloudToTempUrl(fileID) {
   }
 }
 
+/**
+ * 解析弹窗海报地址为 <image> 可直接加载的地址。
+ * cloud:// 文件 ID 不能直接作为 src（会被当成相对路径拼到页面目录下导致加载失败）；
+ * 优先用云开发 SDK 下载为本地临时文件（不受 downloadFile 合法域名限制），失败再退化为临时 HTTPS 链接。
+ */
+async function resolveCloudImage(src) {
+  if (!src || src.indexOf('cloud://') !== 0) return src || '';
+  if (wx.cloud && wx.cloud.downloadFile) {
+    try {
+      const res = await wx.cloud.downloadFile({ fileID: src });
+      if (res && res.tempFilePath) return res.tempFilePath;
+    } catch (e) {
+      console.warn('[popupImage] 云文件下载失败，改用临时链接', e);
+    }
+  }
+  return cloudToTempUrl(src);
+}
+
 module.exports = {
   formatDate,
   formatCST,
@@ -115,5 +133,6 @@ module.exports = {
   genId,
   hashColor,
   cloudToTempUrl,
+  resolveCloudImage,
   BORROW_DAYS
 };
