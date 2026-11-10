@@ -559,8 +559,9 @@ test('值班配置：单日覆盖优先于周规则，且保存后持久化', as
   const s0 = list.find((x) => x.location === loc);
   assert.deepStrictEqual(s0.weekly, [true, true, true, true, true, false, false], '默认周一至周五值班');
 
-  // 选一个固定参考月，在该月内找周一（默认可选，改为不可选）与周六（默认不可选，改为可选）。
-  // 不能从"今天起扫描 60 天"取：周一/周六可能落在不同月份，导致只按 mon 月份构建的月历里找不到 sat。
+  // 动态取「下个月」作为参考月，在该月内找周一（默认可选，改为不可选）与周六（默认不可选，改为可选）。
+  // 不能写死月份：日期很快会变成过去日期，而 borrowBook 会拒绝过去的取书日期，用例会随时间失效；
+  // 也不能从"今天起扫描 60 天"取：周一/周六可能落在不同月份，导致只按 mon 月份构建的月历里找不到 sat。
   const firstDowInMonth = (year, month, dow) => {
     const t = new Date(year, month - 1, 1);
     for (let i = 0; i < 31; i++) {
@@ -569,9 +570,15 @@ test('值班配置：单日覆盖优先于周规则，且保存后持久化', as
     }
     return null;
   };
-  const mon = firstDowInMonth(2026, 11, 1); // 周一
-  const sat = firstDowInMonth(2026, 11, 6); // 周六
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const refYear = nextMonth.getFullYear();
+  const refMonth = nextMonth.getMonth() + 1;
+  const mon = firstDowInMonth(refYear, refMonth, 1); // 周一
+  const sat = firstDowInMonth(refYear, refMonth, 6); // 周六
   assert.ok(mon && sat, '参考月内应能找到周一与周六');
+  const today = util.formatDate(now);
+  assert.ok(mon >= today && sat >= today, '参考日期必须在未来，否则 borrowBook 会拒绝');
 
   const save = await mock.saveSchedule({ location: loc, overrides: { [mon]: false, [sat]: true } });
   assert.strictEqual(save.ok, true);

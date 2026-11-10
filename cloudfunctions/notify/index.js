@@ -4,7 +4,11 @@
  * 职责一：订阅消息（一次性）——应还日期在 3 天内（含已逾期）且用户曾授权，推送「图书到期提醒」。
  * 职责二：站内通知——不依赖订阅授权，保证用户打开小程序就能看到提醒：
  *         · 3 天内到期 → type=due
- *         · 已逾期     → type=overdue（每天最多一条，按 bizId 去重）
+ *         · 已逾期     → type=overdue
+ *         两者按「借阅记录 + 到期日」去重（due/overdue-${_id}-${dueDate}）：同一轮借期只写一条，
+ *         不因定时器每天运行而堆积「已逾期 N 天」；续借改了 dueDate 才会重新提醒。
+ *         管理员手动「逾期提醒」是独立链路（borrowManager.pushNotice 不写 bizId），
+ *         每次点击都写一条，便于管理员对长期未还的书多次催还，不受此处去重影响。
  * 职责三：清理 90 天前的站内通知，避免集合无限增长。
  */
 const cloud = require('wx-server-sdk');
@@ -98,7 +102,7 @@ async function getPrefs(openid) {
   }
 }
 
-/** 写站内通知（bizId 用于去重，避免同一天重复提醒） */
+/** 写站内通知（按 bizId 去重：同一借阅记录的同一到期日只写一条，与"今天是哪天"无关） */
 async function pushInApp(record, type, title, content, bizId) {
   if (!record || !record.userId) return false;
   try {
@@ -112,7 +116,7 @@ async function pushInApp(record, type, title, content, bizId) {
         type,
         title,
         content,
-        link: '/pages/my/borrows/index',
+        link: '/pages/borrow-detail/index?id=' + record._id,
         level: type === 'overdue' ? 'danger' : 'warning',
         bizId,
         read: false,
@@ -135,7 +139,7 @@ async function sendReturnRemind(record, tpl) {
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
       templateId: tpl.templateId,
-      page: 'pages/my/borrows/index',
+      page: 'pages/borrow-detail/index?id=' + record._id,
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
       // 字段名（date1/thing3/number2/thing4…）与取值来自 settings.global.templates.returnRemind
@@ -195,7 +199,7 @@ exports.main = async () => {
   const inAppRes = await db
     .collection('borrows')
     .where({ status: BORROW_STATUS.BORROWING, dueDate: _.lte(in3Days) })
-    .field({ userId: true, bookTitle: true, bookId: true, dueDate: true })
+    .field({ _id: true, userId: true, bookTitle: true, bookId: true, dueDate: true })
     .limit(200)
     .get();
 
@@ -212,7 +216,7 @@ exports.main = async () => {
         'overdue',
         `《${r.bookTitle || '图书'}》已逾期 ${days} 天`,
         '请尽快提交还书申请，逾期会影响信用',
-        `overdue-${r._id}-${today}`
+        `overdue-${r._id}-${due}`
       );
       if (ok) overdueWritten++;
     } else {

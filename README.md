@@ -44,7 +44,9 @@
 1. 在[微信公众平台](https://mp.weixin.qq.com)注册小程序，拿到 AppID 并开通云开发环境。
 2. 把 `project.config.json` 的 `appid` 换成自己的（**只改本地，不要提交**）。
 3. `miniprogram/config/env.js`：`useCloud: true` + `cloudEnv` 填云环境 ID。
-4. 云开发控制台建 4 个集合：`reviews`、`notifications`、`todos`、`noticeLogs`，权限均选「所有用户不可读写」。
+4. 云开发控制台建 **3 个集合**：`reviews`、`todos`、`noticeLogs`，权限均选「所有用户不可读写」。
+   - 站内通知用的 `notifications` 由第 9 步运行 `initDB` 自动创建，无需手动建；运行后同样把它的权限设为「所有用户不可读写」（云函数不受权限规则限制，但保持基线一致）。
+   - 若暂时不想跑 `initDB`，也可以在这一步手动建 `notifications`，效果相同。
 5. **按 [`database.rules.json`](database.rules.json) 配置每个集合的权限**（客户端只直连 `books`，其余集合一律只经云函数访问）。逐集合「权限设置 → 自定义安全规则」粘贴对应对象即可。
 6. 建索引（字段顺序不能乱）：
 
@@ -78,7 +80,7 @@
    - `fields` 的 **key** 是模板关键词（随你在公众平台选的模板而定，配错会报 `47003`），**value** 是取值器名：`bookTitle` / `deliverDate` / `dueDate` / `dueDateFull` / `dueCount` / `dueTip` / `overdueDays` / `overdueTip`。其中 `number2` 是**数字类型**，只能填数值（`dueCount` 默认 `1`），不能填 `bookId` 这类字符串，否则报 `47003`；`thing` 类型关键词（如 `thing3`/`thing4`）上限 20 字，`dueTip` 已按此截断。
    - 不同小程序、或你的模板关键词与示例不一致时，**只改 `settings` 里的 `templates` 即可**，无需改 `borrowManager` / `notify` 代码；首次运行 `initDB` 会自动写入这份默认配置。
 
-9. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次，写入种子图书与全局设置。
+9. 云开发控制台 → 云函数 → `initDB` → 测试，参数 `{}` 运行一次：幂等建齐 `books` / `borrows` / `users` / `settings` / `notifications` 集合，并写入种子图书、全局设置与默认模板。其余 3 个第二期集合（`todos` / `noticeLogs` / `reviews`）仍按第 4 步手动创建。
 
 > 每一步的点按路径、验收清单、常见报错对照，见 **[docs/本地验证指南.md](docs/本地验证指南.md)**。
 
@@ -118,7 +120,8 @@
         ├── recommend/           # 为你推荐
         ├── message/             # 消息中心（通知 / 待办 / 通知设置）
         ├── my/                  # 我的（借书证、快捷入口、未读红点）
-        ├── my/borrows/          # 我的借阅
+        ├── my/borrows/          # 我的借阅（完整记录）
+        ├── borrow-detail/       # 单条借阅详情（借阅类通知点击落地页：时间线、续借/还书）
         ├── login/               # 登录
         └── admin/               # 管理端
             ├── index/           # 管理首页
@@ -158,7 +161,7 @@
 | 函数 | 职责 | 触发器 / 权限 |
 |---|---|---|
 | `login` | openid 换取用户；`settings.adminOpenid` / `ADMIN_OPENID` 为空时首个用户为管理员 | — |
-| `initDB` | 建集合、写全局设置与种子图书（幂等） | 手动执行一次 |
+| `initDB` | 建集合（`books` / `borrows` / `users` / `settings` / `notifications`）、写全局设置与种子图书（幂等） | 手动执行一次 |
 | `borrowManager` | 借阅全流程、逾期提醒、借书证审批、图书增删改、管理端借阅查询（`adminBorrows` / `bookBorrows`） | `subscribeMessage.send`；模板见 `settings.global.templates`；环境变量 `MP_STATE`、`ADMIN_OPENID` |
 | `notify` | 每天 9:00 扫描到期/逾期，发订阅消息 + 写站内通知，清理 90 天前通知 | timer `0 0 9 * * *`、`subscribeMessage.send`；模板见 `settings.global.templates`；环境变量 `MP_STATE` |
 | `notifyManager` | 通知列表/已读/偏好、待办 CRUD、管理员群发与发送记录（**前端入口已下线，能力保留**） | — |
@@ -166,7 +169,7 @@
 | `insightManager` | 用户统计、书籍统计、CSV 导出、推荐打分 | — |
 | `lookupBook` | ISBN/书名查书 | 30s 超时 |
 
-> ⚠️ **部署 `notify` 后必须确认定时器触发器已挂载。** `notify` 依赖 `cloudfunctions/notify/config.json` 里的 `dailyReturnRemind`（`0 0 9 * * *`，每天 09:00）定时触发；但 IDE「上传并部署」常常不会自动建触发器，导致函数在控制台显示为「普通云函数」、`main()` 从不执行——表现为：收不到任何订阅消息/站内通知、`borrows` 里也从无 `reminded` 字段。部署后在云函数控制台「触发器」页确认 `dailyReturnRemind` 存在且启用；若缺失则手动新建定时触发器（周期 `0 0 9 * * *`）。建完可点「测试」手动触发一次 `main()` 立即验证（会被处理的记录写入 `reminded`、并自动创建 `notifications` 集合）。
+> ⚠️ **部署 `notify` 后必须确认定时器触发器已挂载。** `notify` 依赖 `cloudfunctions/notify/config.json` 里的 `dailyReturnRemind`（`0 0 9 * * *`，每天 09:00）定时触发；但 IDE「上传并部署」常常不会自动建触发器，导致函数在控制台显示为「普通云函数」、`main()` 从不执行——表现为：收不到任何订阅消息/站内通知、`borrows` 里也从无 `reminded` 字段。部署后在云函数控制台「触发器」页确认 `dailyReturnRemind` 存在且启用；若缺失则手动新建定时触发器（周期 `0 0 9 * * *`）。建完可点「测试」手动触发一次 `main()` 立即验证（会被处理的记录写入 `reminded`、并向 `notifications` 写入提醒通知）。
 
 ## 图片资源与云存储权限（`cloud://` 限制）
 
@@ -255,9 +258,9 @@ node test/run-tests.js     # 无需安装依赖
 - **换了集合权限后「我的借阅」打不开？** 该功能走 `myBorrows` 云函数，不受客户端规则影响；若报错请确认 `borrowManager` 已部署。
 - **如何重置本地数据？** 开发者工具「清除缓存 → 清除数据缓存」恢复种子数据。
 - **云模式借阅失败？** 确认已部署 `login` / `borrowManager`，且 `books`/`borrows` 集合已创建。
-- **消息中心一直空的？** 通知只由业务动作产生（借阅通过、审批结果、逾期提醒、书评回复）。先完成一次借书流程（申请 → 管理端确认借出）看红点是否出现。
+- **消息中心一直空的？** 先确认 `notifications` 集合已存在（跑一次 `initDB`，或按第 4 步手动建），权限为「所有用户不可读写」。集合不存在时云函数报错会被转成空列表，页面表现为**空白而不是报错**，很容易误判成业务没触发。站内通知只由业务动作产生（借阅通过、审批结果、逾期提醒、书评回复），完成一次借书流程（申请 → 管理端确认借出）即可看到红点。
 - **管理端「发送通知」/广播公告去哪了？** 该功能前端入口已下线（暂无业务场景）。服务端 `notifyManager` 的 `send` / `sentList`、`noticeLogs` 集合与 `services` 层实现**保留**，便于以后恢复；当前管理端该入口为「首页弹窗公告」。
-- **收不到订阅消息/站内通知，且 `borrows` 里没有任何 `reminded` 字段？** `notify` 多半是「普通云函数」、定时器触发器没挂上（`main()` 从没跑过）。去云函数控制台 `notify` 的「触发器」页确认 `dailyReturnRemind`（`0 0 9 * * *`）存在且启用；缺失就手动新建。可点「测试」手动触发一次验证：被处理的记录会写入 `reminded`，并自动创建 `notifications` 集合。注意：即使跑起来了，订阅消息也只是「距到期 ≤3 天」时推一次（一次性订阅），不会在逾期后单独再推。
+- **收不到订阅消息/站内通知，且 `borrows` 里没有任何 `reminded` 字段？** `notify` 多半是「普通云函数」、定时器触发器没挂上（`main()` 从没跑过）。去云函数控制台 `notify` 的「触发器」页确认 `dailyReturnRemind`（`0 0 9 * * *`）存在且启用；缺失就手动新建。可点「测试」手动触发一次验证：被处理的记录会写入 `reminded`，并向 `notifications` 写入提醒通知。注意：即使跑起来了，订阅消息也只是「距到期 ≤3 天」时推一次（一次性订阅），不会在逾期后单独再推。
 - **导出的 CSV 在哪？** 手机端会弹「发送给朋友」，发到文件传输助手即可在电脑打开；开发者工具模拟器不支持转发文件，会降级为复制到剪贴板。
 - **书评提交提示包含敏感词？** 本地词库预检拦截，词库在 `cloudfunctions/reviewManager/index.js`。
 - **图片/弹窗海报空白，报 `Failed to load image .../cloud://...`？** `cloud://` 不能直接当 `<image src>`，见上文「图片资源与云存储权限」。

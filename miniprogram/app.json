@@ -4,6 +4,7 @@
     "pages/book-detail/index",
     "pages/my/index",
     "pages/my/borrows/index",
+    "pages/borrow-detail/index",
     "pages/message/index",
     "pages/book-reviews/index",
     "pages/recommend/index",

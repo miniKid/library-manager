@@ -1,0 +1,58 @@
+@import "../my/borrow.wxss";
+
+.detail-empty-sub { font-size: 24rpx; color: var(--c-text-3); margin-top: 12rpx; }
+.detail-sub { font-size: 26rpx; color: #999; margin-bottom: 4rpx; }
+.detail-section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin: 20rpx 0 8rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #F0F1F3;
+}
+.detail-rows { display: flex; flex-direction: column; }
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12rpx 0;
+  font-size: 27rpx;
+  border-bottom: 1rpx dashed #F4F5F7;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-label { color: #888; }
+.detail-value { color: #333; }
+.renew-btn { margin-right: 16rpx; background: var(--c-primary-2); }
+
+.sheet-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+}
+.sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: #fff;
+  z-index: 201;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.sheet-head { margin-bottom: 24rpx; }
+.sheet-title { font-size: 32rpx; font-weight: 600; }
+.sheet-loc { font-size: 24rpx; color: #999; margin-top: 8rpx; }
+.sheet-body { padding: 8rpx 0 24rpx; }
+.date-picker-value {
+  padding: 24rpx;
+  border: 1rpx solid var(--c-line);
+  border-radius: 16rpx;
+  background: #F8FAFC;
+  font-size: 30rpx;
+  color: #333;
+  text-align: center;
+}
+.date-picker-placeholder { color: #aaa; }
+.date-picker-tip { font-size: 22rpx; color: var(--c-text-3); margin-top: 12rpx; }
+.sheet-foot { display: flex; gap: 20rpx; }
+.sheet-foot button { flex: 1; margin: 0; }

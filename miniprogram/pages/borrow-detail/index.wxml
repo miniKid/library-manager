@@ -1,0 +1,61 @@
+<view class="page safe-bottom">
+  <view wx:if="{{loading}}" class="empty">
+    <view class="empty-icon">⏳</view>
+    <view>加载中…</view>
+  </view>
+
+  <view wx:elif="{{notFound}}" class="empty">
+    <view class="empty-icon">📭</view>
+    <view>未找到该借阅记录</view>
+    <view class="detail-empty-sub">记录可能已删除，或不属于当前登录账号</view>
+  </view>
+
+  <block wx:else>
+    <view class="card borrow-card">
+      <view class="borrow-head flex-between">
+        <view class="borrow-title-group">
+          <text class="borrow-title ellipsis">{{item.bookTitle}}</text>
+        </view>
+        <view class="tag {{statusInfo.cls}}">{{statusInfo.text}}</view>
+      </view>
+      <view class="detail-sub">馆藏：{{item.location || '—'}}</view>
+
+      <view class="detail-section-title">借阅时间线</view>
+      <view class="detail-rows">
+        <view class="detail-row" wx:for="{{timeline}}" wx:for-item="row" wx:key="label">
+          <text class="detail-label">{{row.label}}</text>
+          <text class="detail-value">{{row.value}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{renewTip}}" class="borrow-status-tip">{{renewTip}}</view>
+      <view wx:if="{{statusTip}}" class="borrow-status-tip">{{statusTip}}</view>
+
+      <view wx:if="{{canRenew || item.status === 'borrowing' || item.status === 'overdue' || item.status === 'pending' || item.status === 'return_requested'}}" class="borrow-actions">
+        <view wx:if="{{canRenew}}" class="return-btn renew-btn" bindtap="onRenew">申请续借</view>
+        <view wx:if="{{item.status === 'borrowing' || item.status === 'overdue'}}" class="return-btn" bindtap="onRequestReturn">预约还书</view>
+        <view wx:if="{{item.status === 'pending'}}" class="cancel-btn" bindtap="onCancelBorrow">取消申请</view>
+        <view wx:if="{{item.status === 'return_requested'}}" class="cancel-btn" bindtap="onCancelReturn">取消还书申请</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 预约还书日期选择 -->
+  <view class="sheet-mask" wx:if="{{returnPanel.show}}" bindtap="closeReturnPanel"></view>
+  <view class="sheet" wx:if="{{returnPanel.show}}">
+    <view class="sheet-head">
+      <view class="sheet-title">选择还书日期</view>
+      <view class="sheet-loc">《{{item.bookTitle}}》　馆藏：{{item.location}}</view>
+    </view>
+    <view class="sheet-body">
+      <picker mode="date" start="{{returnPanel.min}}" end="{{returnPanel.max}}" value="{{returnPanel.date}}" bindchange="onPickReturnDate">
+        <view class="date-picker-value {{returnPanel.date ? '' : 'date-picker-placeholder'}}">{{returnPanel.date || '点击选择日期'}}</view>
+      </picker>
+      <view class="date-picker-tip">仅可选择该馆藏有人值班的日期，可预约未来 30 天内</view>
+    </view>
+    <view class="sheet-foot">
+      <button class="btn-plain" bindtap="closeReturnPanel">取消</button>
+      <button class="btn-primary" disabled="{{!returnPanel.date}}" bindtap="onSubmitReturn">提交归还申请</button>
+    </view>
+  </view>
+</view>

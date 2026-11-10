@@ -191,7 +191,7 @@ async function userSystemTodos(openid) {
           desc: '请尽快提交还书申请，逾期会影响信用',
           level: 'danger',
           dueDateText: due,
-          link: '/pages/my/borrows/index'
+          link: '/pages/borrow-detail/index?id=' + r._id
         });
       } else if (left <= 3) {
         out.push({
@@ -201,7 +201,7 @@ async function userSystemTodos(openid) {
           desc: '可续借，或按时归还',
           level: 'warning',
           dueDateText: due,
-          link: '/pages/my/borrows/index'
+          link: '/pages/borrow-detail/index?id=' + r._id
         });
       }
     }
@@ -213,7 +213,7 @@ async function userSystemTodos(openid) {
         desc: '已提交预约还书，请按时到馆交接',
         level: 'info',
         dueDateText: r.scheduledReturnDate || '',
-        link: '/pages/my/borrows/index'
+        link: '/pages/borrow-detail/index?id=' + r._id
       });
     }
     if (r.status === 'pending') {
@@ -227,7 +227,7 @@ async function userSystemTodos(openid) {
           desc: gap <= 0 ? '取书日期已到，请到馆领取' : '取书日期是明天，请安排时间',
           level: gap <= 0 ? 'warning' : 'info',
           dueDateText: pickup,
-          link: '/pages/my/borrows/index'
+          link: '/pages/borrow-detail/index?id=' + r._id
         });
       }
     }

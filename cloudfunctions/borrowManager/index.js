@@ -496,7 +496,7 @@ async function doConfirmBorrow(event) {
     'borrow',
     '借阅成功',
     `《${rec.bookTitle || '图书'}》已借出，应还日期 ${cstDateStr(rec.dueDate)}`,
-    '/pages/my/borrows/index',
+    '/pages/borrow-detail/index?id=' + rec._id,
     'info'
   );
   return { ok: true };
@@ -626,7 +626,7 @@ async function sendBorrowOk(record) {
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
       templateId: tpl.templateId,
-      page: 'pages/my/index',            // 点击消息进入「我的」页
+      page: 'pages/borrow-detail/index?id=' + record._id, // 点击消息直达该条借阅详情
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
       // 字段名（thing1/time5/time3…）与取值来自 settings.global.templates.borrowOk，
@@ -679,13 +679,15 @@ async function doSendOverdueRemind(event = {}) {
   if (!record.userId) return { ok: false, msg: '该记录缺少借阅人信息' };
   const due = new Date(record.dueDate);
   const days = Math.max(0, Math.ceil((Date.now() - due.getTime()) / 86400000));
+  // 管理员主动催还：每次点击都写一条，刻意不去重（用户可能长期未还，需要多次触发）。
+  // 本链路不写 bizId，不受 notify 定时器按 bizId 去重的影响，请勿在此处加去重。
   // 无论订阅消息是否成功，先写一条站内通知（订阅额度可能已用完）
   await pushNotice(
     record.userId,
     'overdue',
     `《${record.bookTitle || '图书'}》已逾期 ${days} 天`,
     '请尽快提交还书申请，逾期会影响信用',
-    '/pages/my/borrows/index',
+    '/pages/borrow-detail/index?id=' + record._id,
     'danger'
   );
   try {
@@ -694,7 +696,7 @@ async function doSendOverdueRemind(event = {}) {
     await cloud.openapi.subscribeMessage.send({
       touser: record.userId,
       templateId: tpl.templateId,
-      page: 'pages/my/index',            // 点击消息进入「我的」页
+      page: 'pages/borrow-detail/index?id=' + record._id, // 点击消息直达该条借阅详情
       miniprogram_state: MP_STATE,
       lang: 'zh_CN',
       // 字段名（thing1/short_thing4/thing5…）与取值来自 settings.global.templates.overdueRemind

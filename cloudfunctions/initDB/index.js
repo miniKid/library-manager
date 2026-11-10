@@ -56,6 +56,9 @@ exports.main = async () => {
   await ensureCollection('borrows');
   await ensureCollection('users');
   await ensureCollection('settings');
+  // 站内通知（消息中心通知 tab / 未读红点 / 各云函数写通知）只依赖这一张表；
+  // todos / noticeLogs / reviews 仍按 README 快速开始在控制台手动创建
+  await ensureCollection('notifications');
 
   // 初始化 settings（幂等）
   let settingsDoc = null;

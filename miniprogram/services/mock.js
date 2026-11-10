@@ -664,7 +664,7 @@ async function confirmBorrow(borrowId) {
     'borrow',
     '借阅成功',
     `《${record.bookTitle || book.title}》已借出，请于 ${formatDate(record.dueDate)} 前归还。`,
-    '/pages/my/borrows/index',
+    '/pages/borrow-detail/index?id=' + record._id,
     'success'
   );
   saveDb(db);
@@ -966,7 +966,7 @@ async function sendOverdueRemind(borrowId) {
     'overdue',
     `《${record.bookTitle || '图书'}》已逾期 ${days} 天`,
     '请尽快提交还书申请，逾期会影响信用',
-    '/pages/my/borrows/index',
+    '/pages/borrow-detail/index?id=' + record._id,
     'danger'
   );
   record.reminded = true;
@@ -1127,13 +1127,13 @@ async function getTodos() {
         if (r.status === BORROW_STATUS.BORROWING && r.dueDate) {
           const due = cstDateStr(r.dueDate);
           const left = Math.round((new Date(due + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 86400000);
-          if (left < 0) system.push({ id: 'sys-overdue-' + r._id, type: 'system', title: `《${title}》已逾期 ${-left} 天`, desc: '请尽快提交还书申请', level: 'danger', dueDateText: due, link: '/pages/my/borrows/index' });
-          else if (left <= 3) system.push({ id: 'sys-due-' + r._id, type: 'system', title: `《${title}》还有 ${left} 天到期`, desc: '可续借，或按时归还', level: 'warning', dueDateText: due, link: '/pages/my/borrows/index' });
+          if (left < 0) system.push({ id: 'sys-overdue-' + r._id, type: 'system', title: `《${title}》已逾期 ${-left} 天`, desc: '请尽快提交还书申请', level: 'danger', dueDateText: due, link: '/pages/borrow-detail/index?id=' + r._id });
+          else if (left <= 3) system.push({ id: 'sys-due-' + r._id, type: 'system', title: `《${title}》还有 ${left} 天到期`, desc: '可续借，或按时归还', level: 'warning', dueDateText: due, link: '/pages/borrow-detail/index?id=' + r._id });
         }
-        if (r.status === BORROW_STATUS.RETURN_REQUESTED) system.push({ id: 'sys-ret-' + r._id, type: 'system', title: `《${title}》等待管理员确认归还`, desc: '请按时到馆交接', level: 'info', dueDateText: r.scheduledReturnDate || '', link: '/pages/my/borrows/index' });
+        if (r.status === BORROW_STATUS.RETURN_REQUESTED) system.push({ id: 'sys-ret-' + r._id, type: 'system', title: `《${title}》等待管理员确认归还`, desc: '请按时到馆交接', level: 'info', dueDateText: r.scheduledReturnDate || '', link: '/pages/borrow-detail/index?id=' + r._id });
         if (r.status === BORROW_STATUS.PENDING && r.scheduledPickupDate) {
           const gap = Math.round((new Date(r.scheduledPickupDate + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 86400000);
-          if (gap <= 1) system.push({ id: 'sys-pick-' + r._id, type: 'system', title: `《${title}》待取书`, desc: gap <= 0 ? '取书日期已到，请到馆领取' : '取书日期是明天', level: 'warning', dueDateText: r.scheduledPickupDate, link: '/pages/my/borrows/index' });
+          if (gap <= 1) system.push({ id: 'sys-pick-' + r._id, type: 'system', title: `《${title}》待取书`, desc: gap <= 0 ? '取书日期已到，请到馆领取' : '取书日期是明天', level: 'warning', dueDateText: r.scheduledPickupDate, link: '/pages/borrow-detail/index?id=' + r._id });
         }
       });
   }
