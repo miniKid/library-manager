@@ -10,13 +10,20 @@
           data-field="isbn"
           bindinput="onInput"
         />
-        <button
-          class="lookup-btn"
-          size="mini"
-          bindtap="onLookupIsbn"
-          loading="{{lookupLoading}}"
-          disabled="{{lookupLoading}}"
-        >自动获取</button>
+        <view
+          class="scan-btn {{lookupLoading ? 'scan-btn-disabled' : ''}}"
+          hover-class="{{lookupLoading ? '' : 'scan-btn-hover'}}"
+          bindtap="onScanIsbn"
+          aria-label="扫码录入 ISBN"
+        >
+          <view class="scan-icon">
+            <view class="scan-corner scan-tl"></view>
+            <view class="scan-corner scan-tr"></view>
+            <view class="scan-corner scan-bl"></view>
+            <view class="scan-corner scan-br"></view>
+            <view class="scan-line"></view>
+          </view>
+        </view>
       </view>
     </view>
     <view class="form-item">

@@ -1,6 +1,22 @@
 const services = require('../../../services/index');
 const { toLocalFile } = require('../../../utils/cover');
 
+/** ISBN-13 限 978/979 前缀并校验末位；ISBN-10 校验加权和（末位可为 X） */
+function isValidIsbn(value) {
+  if (/^97[89]\d{10}$/.test(value)) {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += Number(value[i]) * (i % 2 === 0 ? 1 : 3);
+    return (10 - (sum % 10)) % 10 === Number(value[12]);
+  }
+  if (/^\d{9}[\dX]$/.test(value)) {
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += Number(value[i]) * (10 - i);
+    const last = value[9] === 'X' ? 10 : Number(value[9]);
+    return (sum + last) % 11 === 0;
+  }
+  return false;
+}
+
 /** 读取本地文件为 base64 字符串 */
 function readBase64(filePath) {
   return new Promise((resolve, reject) => {
@@ -133,7 +149,27 @@ Page({
 
   onInput(e) {
     const field = e.currentTarget.dataset.field;
-    this.setData({ ['form.' + field]: e.detail.value });
+    const value = e.detail.value;
+    this.setData({ ['form.' + field]: value });
+    if (field === 'isbn') this.scheduleIsbnLookup(value);
+  },
+
+  /** 手动输入 ISBN 防抖自动查询：停 600ms 且校验通过时触发，同一 ISBN 不重复查 */
+  scheduleIsbnLookup(value) {
+    if (this._isbnTimer) clearTimeout(this._isbnTimer);
+    const isbn = String(value || '').replace(/[^\dXx]/g, '').toUpperCase();
+    if (!isValidIsbn(isbn) || isbn === this._autoLookedIsbn) return;
+    this._isbnTimer = setTimeout(() => {
+      this._isbnTimer = null;
+      // timer 期间用户可能又改了，以最新值为准
+      const current = String(this.data.form.isbn || '').replace(/[^\dXx]/g, '').toUpperCase();
+      if (!isValidIsbn(current) || current === this._autoLookedIsbn || this.data.lookupLoading) return;
+      this.onLookupIsbn(true);
+    }, 600);
+  },
+
+  onUnload() {
+    if (this._isbnTimer) clearTimeout(this._isbnTimer);
   },
 
   onCategoryChange(e) {
@@ -144,15 +180,49 @@ Page({
     });
   },
 
-  /** 输入 ISBN 后自动获取图书信息 */
-  async onLookupIsbn() {
-    const isbn = this.data.form.isbn.trim();
-    if (!isbn) {
-      wx.showToast({ title: '请先输入 ISBN', icon: 'none' });
+  /** 扫描图书条码：清理并校验 ISBN 后填入，再自动获取图书信息 */
+  async onScanIsbn() {
+    if (this.data.lookupLoading) return;
+    const result = await new Promise((resolve) => {
+      wx.scanCode({
+        onlyFromCamera: false,
+        scanType: ['barCode'],
+        success: (res) => resolve((res && res.result) || ''),
+        fail: () => resolve('')
+      });
+    });
+    if (!result) return; // 用户取消扫码，不打扰
+
+    const isbn = String(result).replace(/[^\dXx]/g, '').toUpperCase();
+    if (!isValidIsbn(isbn)) {
+      wx.showToast({ title: '未识别到有效 ISBN，请手动输入', icon: 'none' });
+      return;
+    }
+    this.setData({ 'form.isbn': isbn });
+    wx.showToast({ title: '已识别 ISBN，自动获取中', icon: 'success' });
+    this.onLookupIsbn();
+  },
+
+  /** 输入防抖 / 扫码统一入口；silent=true 时显示等待提示但不弹结果 toast（自动触发用） */
+  async onLookupIsbn(silent) {
+    const quiet = silent === true;
+    const input = this.data.form.isbn.trim();
+    if (!input) {
+      if (!quiet) wx.showToast({ title: '请先输入 ISBN', icon: 'none' });
       return;
     }
     if (this.data.lookupLoading) return;
+    // 记录已查询值，防止自动防抖与扫码对同一 ISBN 重复请求
+    const normalized = String(input).replace(/[^\dXx]/g, '').toUpperCase();
+    if (quiet) this._autoLookedIsbn = normalized;
+    if (this._isbnTimer) {
+      clearTimeout(this._isbnTimer);
+      this._isbnTimer = null;
+    }
+    const isbn = input;
     this.setData({ lookupLoading: true });
+    // 自动触发时给持续等待提示，避免真机上云函数耗时期间用户以为没反应
+    if (quiet) wx.showLoading({ title: '自动获取中…', mask: false });
     try {
       const res = await services.lookupBook(isbn);
       if (res && res.ok && res.data) {
@@ -179,21 +249,28 @@ Page({
         this.setData(patch);
         if (d.coverError) {
           console.warn('[book-edit] cover 转存失败，已使用网络直链:', d.coverError);
-          wx.showToast({
-            title: '封面已用网络直链（转存失败）',
-            icon: 'none'
-          });
-        } else {
+          if (!quiet) wx.showToast({ title: '封面已用网络直链（转存失败）', icon: 'none' });
+        } else if (!quiet) {
           wx.showToast({ title: '查询成功，已自动填充', icon: 'success' });
         }
+        if (quiet) console.log('[book-edit] ISBN 自动查询成功并已填充', isbn);
       } else {
-        wx.showToast({ title: (res && res.msg) || '未查询到该图书', icon: 'none' });
+        if (!quiet) wx.showToast({ title: (res && res.msg) || '未查询到该图书', icon: 'none' });
+        else {
+          console.warn('[book-edit] ISBN 自动查询未命中', isbn, res && res.msg);
+          this._autoLookedIsbn = ''; // 失败后允许重新输入同一 ISBN 再次触发
+        }
       }
     } catch (e) {
       console.error('[book-edit] lookup isbn error:', e);
-      const msg = (e && e.errMsg) || e.message || '查询失败，请检查网络';
-      wx.showToast({ title: msg.length > 20 ? msg.slice(0, 20) + '…' : msg, icon: 'none' });
+      if (!quiet) {
+        const msg = (e && e.errMsg) || e.message || '查询失败，请检查网络';
+        wx.showToast({ title: msg.length > 20 ? msg.slice(0, 20) + '…' : msg, icon: 'none' });
+      } else {
+        this._autoLookedIsbn = '';
+      }
     } finally {
+      if (quiet) wx.hideLoading();
       this.setData({ lookupLoading: false });
     }
   },
